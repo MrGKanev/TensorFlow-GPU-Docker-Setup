@@ -1,0 +1,69 @@
+# Use the official TensorFlow GPU image with a specific version 
+# that has known CUDA compatibility
+FROM tensorflow/tensorflow:2.11.0-gpu
+
+# Set a working directory
+WORKDIR /app
+
+# Install system dependencies and clean up in the same layer
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    wget \
+    curl \
+    git \
+    build-essential \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Upgrade pip and install required Python packages in a single layer
+# This creates fewer layers and allows better cleanup
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir \
+    numpy \
+    pandas \
+    scikit-learn \
+    && find /usr/local/lib/python3.* -name __pycache__ -type d -exec rm -rf {} +
+
+# Add CUDA Path environment variables - important for WSL environments
+ENV PATH="/usr/local/cuda/bin:${PATH}"
+ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64:${LD_LIBRARY_PATH}"
+
+# Check and install CUDA if needed for WSL-Ubuntu
+RUN echo "Checking CUDA installation status for WSL-Ubuntu..." && \
+    # Install CUDA if not found
+    if [ ! -d "/usr/local/cuda" ]; then \
+        echo "CUDA not found, installing CUDA Toolkit..." && \
+        apt-get update && apt-get install -y --no-install-recommends \
+        gnupg2 curl ca-certificates && \
+        curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/3bf863cc.pub | apt-key add - && \
+        echo "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64 /" > /etc/apt/sources.list.d/cuda.list && \
+        apt-get update && apt-get install -y --no-install-recommends \
+        cuda-toolkit-11-8 && \
+        apt-get clean && \
+        rm -rf /var/lib/apt/lists/*; \
+    else \
+        echo "CUDA directory found at /usr/local/cuda"; \
+    fi && \
+    # Check if we're in WSL
+    (grep -q "microsoft" /proc/version 2>/dev/null && echo "Running in WSL environment" || echo "Not running in WSL") && \
+    # Check for NVIDIA driver in WSL
+    (ls -la /usr/lib/wsl/lib/nvidia-smi 2>/dev/null || echo "WSL NVIDIA driver not found") && \
+    # Check for NVIDIA kernel driver
+    (cat /proc/driver/nvidia/version 2>/dev/null || echo "NVIDIA kernel driver not detected") && \
+    # Final GPU check
+    (command -v nvidia-smi >/dev/null && nvidia-smi || echo "nvidia-smi not available")
+
+# Verify TensorFlow can use the GPU
+RUN python -c "import tensorflow as tf; print('TensorFlow version:', tf.__version__); print('CUDA Availability:', tf.test.is_built_with_cuda()); print('GPU Available:', tf.test.is_gpu_available() if hasattr(tf.test, 'is_gpu_available') else len(tf.config.list_physical_devices('GPU'))>0); print('GPUs:', tf.config.list_physical_devices('GPU'))" || echo "TensorFlow GPU check failed"
+
+
+# Final cleanup to reduce image size
+RUN apt-get autoremove -y && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    rm -rf /root/.cache && \
+    rm -rf /tmp/* && \
+    find /usr/local/lib/python3.* -name '*.pyc' -delete && \
+    find /usr/local/lib/python3.* -name '*.so' -exec strip -s {} \; || true
+
+# Set the default command
+CMD ["bash"]
