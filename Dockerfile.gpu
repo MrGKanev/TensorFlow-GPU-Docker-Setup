@@ -32,9 +32,11 @@ RUN pip install --no-cache-dir --upgrade pip && \
 ENV PATH="/usr/local/cuda/bin:${PATH}"
 ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64:${LD_LIBRARY_PATH}"
 
-# Copy the GPU test script
+# Copy test scripts
 COPY test_gpu.py /app/test_gpu.py
+COPY tensorflow_pycharm_fix.py /app/tensorflow_pycharm_fix.py
 RUN chmod +x /app/test_gpu.py
+RUN chmod +x /app/tensorflow_pycharm_fix.py
 
 # Verify TensorFlow can use the GPU
 RUN echo "Note: GPU checks in build will likely fail. The container must be run with --gpus all"
