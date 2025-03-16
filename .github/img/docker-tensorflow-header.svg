@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400">
+  <!-- Background -->
+  <rect width="800" height="400" fill="#282c34" />
+  
+  <!-- Title -->
+  <text x="400" y="60" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="white" text-anchor="middle">TensorFlow, Docker and GPUs:</text>
+  <text x="400" y="100" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="white" text-anchor="middle">A Windows 11 Nightmare Solved</text>
+  
+  <!-- Emoji Row -->
+  <g transform="translate(100, 200)">
+    <!-- Windows Emoji -->
+    <text x="0" y="0" font-size="70" text-anchor="middle">🪟</text>
+    
+    <!-- Plus Sign -->
+    <text x="100" y="0" font-size="40" text-anchor="middle" fill="white">+</text>
+    
+    <!-- Brain (TensorFlow) -->
+    <text x="200" y="0" font-size="70" text-anchor="middle">🧠</text>
+    
+    <!-- Plus Sign -->
+    <text x="300" y="0" font-size="40" text-anchor="middle" fill="white">+</text>
+    
+    <!-- GPU/Computer -->
+    <text x="400" y="0" font-size="70" text-anchor="middle">💻</text>
+    
+    <!-- Equals -->
+    <text x="500" y="0" font-size="40" text-anchor="middle" fill="white">=</text>
+    
+    <!-- Explosion/Error -->
+    <text x="600" y="0" font-size="70" text-anchor="middle">💥</text>
+  </g>
+  
+  <!-- Second Row - Docker Solution -->
+  <g transform="translate(100, 300)">
+    <!-- Docker Container -->
+    <text x="0" y="0" font-size="70" text-anchor="middle">📦</text>
+    
+    <!-- Plus Sign -->
+    <text x="100" y="0" font-size="40" text-anchor="middle" fill="white">+</text>
+    
+    <!-- Brain (TensorFlow) -->
+    <text x="200" y="0" font-size="70" text-anchor="middle">🧠</text>
+    
+    <!-- Plus Sign -->
+    <text x="300" y="0" font-size="40" text-anchor="middle" fill="white">+</text>
+    
+    <!-- GPU/Computer -->
+    <text x="400" y="0" font-size="70" text-anchor="middle">💻</text>
+    
+    <!-- Equals -->
+    <text x="500" y="0" font-size="40" text-anchor="middle" fill="white">=</text>
+    
+    <!-- Success -->
+    <text x="600" y="0" font-size="70" text-anchor="middle">✅</text>
+  </g>
+  
+  <!-- Error Messages -->
+  <g opacity="0.7">
+    <text x="200" y="160" font-family="'Courier New', monospace" font-size="12" fill="#FF6060" transform="rotate(-10, 200, 160)">libcudart.so.11.0: cannot open shared object file</text>
+    <text x="450" y="140" font-family="'Courier New', monospace" font-size="12" fill="#FF6060" transform="rotate(5, 450, 140)">Failed to get convolution algorithm</text>
+    <text x="600" y="170" font-family="'Courier New', monospace" font-size="12" fill="#FF6060" transform="rotate(-5, 600, 170)">GPUs available: []</text>
+  </g>
+  
+  <!-- No decorative elements now -->
+  <g></g>
+</svg>
