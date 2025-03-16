@@ -4,10 +4,10 @@ This repository contains Docker configuration for running TensorFlow with GPU su
 
 ## Prerequisites
 
-- Docker installed
-- NVIDIA GPU with compatible drivers
-- NVIDIA Container Toolkit installed
-- If using WSL2: Properly configured GPU passthrough
+- [Docker](https://docs.docker.com/get-docker/) installed
+- [NVIDIA GPU](https://www.nvidia.com/en-us/geforce/) with [compatible drivers](https://www.nvidia.com/Download/index.aspx)
+- [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) installed
+- If using WSL2: [Properly configured GPU passthrough](https://docs.nvidia.com/cuda/wsl-user-guide/index.html)
 
 ## Quick Start
 
@@ -90,6 +90,42 @@ The test script will:
 2. Run performance benchmarks using matrix multiplication
 3. Train a simple neural network to verify end-to-end functionality
 4. Provide detailed diagnostics if GPU is not detected
+
+## Using with PyCharm
+
+To use this Docker container with PyCharm:
+
+1. **Configure Docker integration in PyCharm:**
+   - Go to Settings/Preferences → Build, Execution, Deployment → Docker
+   - Add your Docker connection
+
+2. **Configure Python Interpreter:**
+   - Go to Settings/Preferences → Project → Python Interpreter
+   - Click the gear icon → Add → Docker
+   - Select your Docker server and the `tensorflow-gpu-custom` image
+
+3. **Fix common TensorFlow errors:**
+   - If you encounter optimizer errors with LSTM models (like `KeyError: 'The optimizer cannot recognize variable lstm/lstm_cell/kernel:0'`), use the legacy optimizers:
+     ```python
+     # Change this:
+     from tensorflow.keras.optimizers import Adam
+     
+     # To this:
+     from tensorflow.keras.optimizers.legacy import Adam
+     ```
+   - Configure GPU memory growth at the start of your script:
+     ```python
+     gpus = tf.config.list_physical_devices('GPU')
+     for gpu in gpus:
+         tf.config.experimental.set_memory_growth(gpu, True)
+     ```
+   - See the included `tensorflow_pycharm_fix.py` script for a complete example
+
+4. **Configure Run Configuration:**
+   - Create a new Run Configuration
+   - Set the Docker container as the target environment
+   - Set the working directory to your project folder
+   - Map your local project directory to a directory in the container
 
 ## Common Issues and Troubleshooting
 
@@ -204,3 +240,43 @@ model.fit(X, y, epochs=5, batch_size=32)
 - The Docker image is based on TensorFlow 2.11.0-gpu for optimal compatibility
 - The container includes proper environment setup for CUDA paths
 - If you encounter memory issues, adjust batch sizes or enable memory growth
+
+## Fixing Common TensorFlow Errors
+
+### KeyError with Optimizers
+
+If you see this error:
+```
+KeyError: 'The optimizer cannot recognize variable lstm/lstm_cell/kernel:0'
+```
+
+This happens because TensorFlow 2.11.0 has both experimental and legacy optimizers. The experimental optimizers have compatibility issues with certain layer types (especially LSTM).
+
+**Solution:**
+1. Use legacy optimizers:
+```python
+# Change this
+from tensorflow.keras.optimizers import Adam
+
+# To this
+from tensorflow.keras.optimizers.legacy import Adam
+```
+
+2. Make sure your input shapes are correct:
+```python
+# Check input shape expectations
+print(model.input_shape)
+```
+
+3. Fix shape mismatches in your data. If your error mentions:
+```
+Model was constructed with shape (None, 30, 1) but was called on input with incompatible shape (64, 1, 1)
+```
+
+Ensure your data matches the expected dimensions:
+```python
+# Reshape your data to match expected input
+X = X.reshape(batch_size, sequence_length, features)
+```
+
+4. See the provided `tensorflow_pycharm_fix.py` script for complete examples
