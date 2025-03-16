@@ -1,5 +1,7 @@
 # TensorFlow GPU Docker Setup
 
+![TensorFlow Docker GPU Header](.github/img/docker-tensorflow-header.svg)
+
 This repository contains Docker configuration for running TensorFlow with GPU support. The setup includes optimizations for WSL2 environments and includes all necessary packages for data science and deep learning tasks.
 
 ## Prerequisites
