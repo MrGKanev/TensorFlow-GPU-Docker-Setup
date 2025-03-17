@@ -37,6 +37,7 @@ docker run --gpus all -it ghcr.io/mrgkanev/tensorflow-gpu-custom
 
 # Run the comprehensive GPU test
 docker run --gpus all -it ghcr.io/mrgkanev/tensorflow-gpu-custom python /app/test_gpu.py
+```
 
 ## Included Packages
 
