@@ -3,9 +3,9 @@ FROM tensorflow/tensorflow:2.11.0-gpu
 
 # Set image metadata
 LABEL name="tensorflow-gpu-custom"
-LABEL maintainer="your-email@example.com"
+LABEL maintainer="mail@gkanev.com"
 LABEL version="1.0"
-LABEL description="Custom TensorFlow GPU image with additional tools"
+LABEL description="TensorFlow GPU image with additional tools for ML"
 
 # Set a working directory
 WORKDIR /app
