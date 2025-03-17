@@ -24,6 +24,20 @@ docker run --gpus all -it tensorflow-gpu-custom
 docker run --gpus all -it tensorflow-gpu-custom python /app/test_gpu.py
 ```
 
+## Using Pre-built Container from GitHub
+
+This repository publishes a pre-built container to GitHub Container Registry, which you can use directly:
+
+```bash
+# Pull the pre-built image
+docker pull ghcr.io/mrgkanev/tensorflow-gpu-custom:latest
+
+# Run with GPU support
+docker run --gpus all -it ghcr.io/mrgkanev/tensorflow-gpu-custom
+
+# Run the comprehensive GPU test
+docker run --gpus all -it ghcr.io/mrgkanev/tensorflow-gpu-custom python /app/test_gpu.py
+
 ## Included Packages
 
 The Docker image includes the following packages:
