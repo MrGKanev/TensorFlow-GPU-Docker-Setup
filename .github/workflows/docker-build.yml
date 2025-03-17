@@ -2,13 +2,13 @@ name: Build and Push Docker Image
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
     paths:
       - 'Dockerfile.gpu'
       - '.github/workflows/docker-build.yml'
       - '**.py'
   pull_request:
-    branches: [ main ]
+    branches: [ master ]
   workflow_dispatch:
 
 jobs:
@@ -39,5 +39,5 @@ jobs:
           file: ./Dockerfile.gpu
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
-            ghcr.io/${{ github.repository_owner }}/tensorflow-gpu-custom:latest
-            ghcr.io/${{ github.repository_owner }}/tensorflow-gpu-custom:2.11.0
+            ghcr.io/mrgkanev/tensorflow-gpu-custom:latest
+            ghcr.io/mrgkanev/tensorflow-gpu-custom:2.11.0
