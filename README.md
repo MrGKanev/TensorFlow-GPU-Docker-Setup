@@ -18,7 +18,7 @@ This repository contains Docker configuration for running TensorFlow with GPU su
 docker build -t tensorflow-gpu-custom -f Dockerfile.gpu .
 
 # Run with GPU support
-docker run --gpus all -it tensorflow-gpu-custom
+docker run --gpus all --name tensorflow-gpu-custom -it tensorflow-gpu-custom
 
 # Run the comprehensive GPU test
 docker run --gpus all -it tensorflow-gpu-custom python /app/test_gpu.py

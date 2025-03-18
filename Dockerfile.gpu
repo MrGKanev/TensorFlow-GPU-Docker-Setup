@@ -26,6 +26,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
     numpy \
     pandas \
     scikit-learn \
+    matplotlib \
     && find /usr/local/lib/python3.* -name __pycache__ -type d -exec rm -rf {} +
 
 # Add CUDA Path environment variables
