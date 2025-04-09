@@ -1,16 +1,11 @@
-# Use the official TensorFlow GPU image with a specific version 
-FROM tensorflow/tensorflow:2.11.0-gpu
+# Multi-stage build for TensorFlow GPU Docker setup
+# Stage 1: Build stage - includes build dependencies and tools
+FROM tensorflow/tensorflow:2.11.0-gpu AS builder
 
-# Set image metadata
-LABEL name="tensorflow-gpu-custom"
-LABEL maintainer="mail@gkanev.com"
-LABEL version="1.0"
-LABEL description="TensorFlow GPU image with additional tools for ML"
+# Set working directory
+WORKDIR /build
 
-# Set a working directory
-WORKDIR /app
-
-# Install system dependencies and clean up in the same layer
+# Install build dependencies in a single layer with cleanup
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     curl \
@@ -19,8 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Upgrade pip and install required Python packages in a single layer
-# This creates fewer layers and allows better cleanup
+# Upgrade pip and install Python packages with cleanup in a single layer
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir \
     numpy \
@@ -29,41 +23,49 @@ RUN pip install --no-cache-dir --upgrade pip && \
     matplotlib \
     && find /usr/local/lib/python3.* -name __pycache__ -type d -exec rm -rf {} +
 
+# Stage 2: Runtime stage - only includes what's needed to run
+FROM tensorflow/tensorflow:2.11.0-gpu
+
+# Set image metadata
+LABEL name="tensorflow-gpu-custom"
+LABEL maintainer="mail@gkanev.com"
+LABEL version="1.1"
+LABEL description="TensorFlow GPU image with additional tools for ML"
+
+# Set working directory
+WORKDIR /app
+
+# Copy Python packages from builder stage
+COPY --from=builder /usr/local/lib/python3.8/dist-packages /usr/local/lib/python3.8/dist-packages
+
 # Add CUDA Path environment variables
 ENV PATH="/usr/local/cuda/bin:${PATH}"
 ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64:${LD_LIBRARY_PATH}"
 
 # Copy test scripts
 COPY test_gpu.py /app/test_gpu.py
+COPY check_gpu.py /app/check_gpu.py
 COPY tensorflow_pycharm_fix.py /app/tensorflow_pycharm_fix.py
-RUN chmod +x /app/test_gpu.py
-RUN chmod +x /app/tensorflow_pycharm_fix.py
+COPY healthcheck.py /app/healthcheck.py
+COPY entrypoint.sh /entrypoint.sh
 
-# Verify TensorFlow can use the GPU
-RUN echo "Note: GPU checks in build will likely fail. The container must be run with --gpus all"
+# Make scripts executable
+RUN chmod +x /app/test_gpu.py /app/check_gpu.py /app/tensorflow_pycharm_fix.py /app/healthcheck.py /entrypoint.sh
 
-# Final cleanup to reduce image size
-RUN apt-get autoremove -y && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* && \
-    rm -rf /root/.cache && \
-    rm -rf /tmp/* && \
-    find /usr/local/lib/python3.* -name '*.pyc' -delete && \
-    find /usr/local/lib/python3.* -name '*.so' -exec strip -s {} \; || true
+# Add health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD python /app/healthcheck.py || exit 1
 
-# Add a helpful message when container starts
-RUN echo '#!/bin/bash' > /entrypoint.sh && \
-    echo 'echo "====================================================="' >> /entrypoint.sh && \
-    echo 'echo "TensorFlow GPU Container"' >> /entrypoint.sh && \
-    echo 'echo "====================================================="' >> /entrypoint.sh && \
-    echo 'echo "To verify GPU access, run: python /app/check_gpu.py"' >> /entrypoint.sh && \
-    echo 'echo "If no GPU is detected, ensure you:"' >> /entrypoint.sh && \
-    echo 'echo "1. Have NVIDIA drivers installed on the host"' >> /entrypoint.sh && \
-    echo 'echo "2. Installed nvidia-container-toolkit on the host"' >> /entrypoint.sh && \
-    echo 'echo "3. Started the container with: --gpus all flag"' >> /entrypoint.sh && \
-    echo 'echo "====================================================="' >> /entrypoint.sh && \
-    echo 'exec "$@"' >> /entrypoint.sh && \
-    chmod +x /entrypoint.sh
+# Create mount points with appropriate permissions
+RUN mkdir -p /workspace/data /workspace/models /workspace/notebooks && \
+    chmod -R 777 /workspace
 
+# Set entrypoint and default command
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["bash"]
+
+# Volume configuration
+VOLUME ["/workspace/data", "/workspace/models", "/workspace/notebooks"]
+
+# Working directory for interactive use
+WORKDIR /workspace

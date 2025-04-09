@@ -1,37 +1,48 @@
-#!/usr/bin/env python3
-"""
-TensorFlow GPU Test Script
-
-This script tests if TensorFlow can access the GPU and runs a simple
-benchmark to verify performance.
-"""
-
-import os
-import time
-import numpy as np
 import tensorflow as tf
-from tensorflow.keras import layers
-from tensorflow.keras.optimizers import Adam
+import os
+import sys
 
-def print_separator(message):
-    """Print a message with separators for better readability."""
-    print("\n" + "=" * 70)
-    print(f" {message}")
-    print("=" * 70)
+# Display environment info
+print("TensorFlow version:", tf.__version__)
+print("Python version:", sys.version)
+print("CUDA Availability:", tf.test.is_built_with_cuda())
 
-def check_environment():
-    """Check TensorFlow and GPU environment."""
-    print_separator("TensorFlow and GPU Environment Check")
+# Check GPU devices
+gpus = tf.config.list_physical_devices('GPU')
+print("GPUs:", gpus)
+
+if len(gpus) > 0:
+    print("\n✅ GPU IS AVAILABLE!")
     
-    print(f"TensorFlow version: {tf.__version__}")
-    print(f"Python version: {tf.python.platform.build_info.python_version}")
-    print(f"CUDA Availability: {tf.test.is_built_with_cuda()}")
+    # Try to allocate a small tensor on GPU to verify it's working
+    try:
+        with tf.device('/device:GPU:0'):
+            a = tf.constant([[1.0, 2.0], [3.0, 4.0]])
+            b = tf.constant([[1.0, 1.0], [1.0, 1.0]])
+            c = tf.matmul(a, b)
+            print("Test GPU computation result:", c)
+            print("✅ GPU computation successful!")
+    except Exception as e:
+        print("❌ GPU computation failed with error:", e)
+else:
+    print("\n❌ NO GPU FOUND!")
+    print("\nTroubleshooting steps:")
+    print("1. Ensure NVIDIA drivers are installed on the host machine")
+    print("   Run 'nvidia-smi' on the host to verify")
     
-    # Check GPU devices
-    gpus = tf.config.list_physical_devices('GPU')
-    print(f"GPUs: {gpus}")
+    print("\n2. Ensure nvidia-container-toolkit is installed:")
+    print("   sudo apt-get install -y nvidia-container-toolkit")
     
-    if len(gpus) > 0:
-        print("\n✅ GPU IS AVAILABLE!")
+    print("\n3. Make sure you're running the container with:")
+    print("   docker run --gpus all -it your-image-name")
+    
+    print("\n4. Check if NVIDIA driver is accessible from container:")
+    if os.path.exists('/proc/driver/nvidia/version'):
+        with open('/proc/driver/nvidia/version', 'r') as f:
+            print("NVIDIA driver version found:", f.read().strip())
+    else:
+        print("NVIDIA driver not accessible in container (/proc/driver/nvidia/version not found)")
         
-        # Configure memory growth to avo
+    print("\n5. Check CUDA environment variables:")
+    print("CUDA_VISIBLE_DEVICES:", os.environ.get('CUDA_VISIBLE_DEVICES', 'Not set'))
+    print("LD_LIBRARY_PATH:", os.environ.get('LD_LIBRARY_PATH', 'Not set'))
