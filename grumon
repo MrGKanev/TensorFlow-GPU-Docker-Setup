@@ -1,0 +1,8 @@
+#!/bin/bash
+echo "GPU Monitoring - Press Ctrl+C to exit"
+echo "======================================="
+while true; do
+  clear
+  nvidia-smi
+  sleep 2
+done

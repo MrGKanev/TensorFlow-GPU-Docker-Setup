@@ -1,4 +1,3 @@
-# Multi-stage build for TensorFlow GPU Docker setup
 # Stage 1: Build stage - includes build dependencies and tools
 FROM tensorflow/tensorflow:2.11.0-gpu AS builder
 
@@ -42,6 +41,37 @@ COPY --from=builder /usr/local/lib/python3.8/dist-packages /usr/local/lib/python
 ENV PATH="/usr/local/cuda/bin:${PATH}"
 ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64:${LD_LIBRARY_PATH}"
 
+# TensorFlow-specific performance optimizations
+ENV TF_GPU_THREAD_MODE=gpu_private
+ENV TF_GPU_THREAD_COUNT=1
+ENV TF_USE_CUDNN=1
+ENV TF_ENABLE_ONEDNN_OPTS=1
+ENV TF_XLA_FLAGS="--tf_xla_auto_jit=2 --tf_xla_cpu_global_jit"
+ENV TF_FORCE_GPU_ALLOW_GROWTH=true
+
+# CUDA configuration for optimal performance
+ENV CUDA_CACHE_DISABLE=0
+ENV CUDA_CACHE_MAXSIZE=2147483647
+ENV CUDA_MODULE_LOADING=LAZY
+
+# Install htop for system monitoring
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    htop \
+    procps \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create proper GPU monitoring script as a separate file
+RUN echo '#!/bin/bash' > /usr/local/bin/gpumon && \
+    echo 'echo "GPU Monitoring - Press Ctrl+C to exit"' >> /usr/local/bin/gpumon && \
+    echo 'echo "======================================="' >> /usr/local/bin/gpumon && \
+    echo 'while true; do' >> /usr/local/bin/gpumon && \
+    echo '  clear' >> /usr/local/bin/gpumon && \
+    echo '  nvidia-smi' >> /usr/local/bin/gpumon && \
+    echo '  sleep 2' >> /usr/local/bin/gpumon && \
+    echo 'done' >> /usr/local/bin/gpumon && \
+    chmod +x /usr/local/bin/gpumon
+
 # Copy test scripts
 COPY test_gpu.py /app/test_gpu.py
 COPY check_gpu.py /app/check_gpu.py
@@ -52,8 +82,8 @@ COPY entrypoint.sh /entrypoint.sh
 # Make scripts executable
 RUN chmod +x /app/test_gpu.py /app/check_gpu.py /app/tensorflow_pycharm_fix.py /app/healthcheck.py /entrypoint.sh
 
-# Add health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+# Add health check with reduced frequency
+HEALTHCHECK --interval=5m --timeout=30s --start-period=10s --retries=2 \
     CMD python /app/healthcheck.py || exit 1
 
 # Create mount points with appropriate permissions
