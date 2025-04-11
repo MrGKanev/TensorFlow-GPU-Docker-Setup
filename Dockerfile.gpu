@@ -5,7 +5,7 @@ FROM tensorflow/tensorflow:2.11.0-gpu
 LABEL name="tensorflow-gpu-custom"
 LABEL maintainer="mail@gkanev.com"
 LABEL version="1.0"
-LABEL description="TensorFlow GPU image with additional tools for ML"
+LABEL description="TensorFlow GPU image with additional tools for ML and benchmarking"
 
 # Set a working directory
 WORKDIR /app
@@ -16,6 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     git \
     build-essential \
+    python3-matplotlib \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -33,11 +34,24 @@ RUN pip install --no-cache-dir --upgrade pip && \
 ENV PATH="/usr/local/cuda/bin:${PATH}"
 ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64:${LD_LIBRARY_PATH}"
 
-# Copy test scripts
+# Copy test and benchmark scripts
 COPY test_gpu.py /app/test_gpu.py
 COPY tensorflow_pycharm_fix.py /app/tensorflow_pycharm_fix.py
+COPY check_gpu.py /app/check_gpu.py
+COPY tensorflow_benchmark.py /app/tensorflow_benchmark.py
+COPY tensorflow_benchmark_quick.py /app/tensorflow_benchmark_quick.py
+COPY run_benchmark.sh /app/run_benchmark.sh
+
+# Make scripts executable
 RUN chmod +x /app/test_gpu.py
 RUN chmod +x /app/tensorflow_pycharm_fix.py
+RUN chmod +x /app/check_gpu.py
+RUN chmod +x /app/tensorflow_benchmark.py
+RUN chmod +x /app/tensorflow_benchmark_quick.py
+RUN chmod +x /app/run_benchmark.sh
+
+# Create directory for benchmark results
+RUN mkdir -p /app/benchmark_results && chmod 777 /app/benchmark_results
 
 # Verify TensorFlow can use the GPU
 RUN echo "Note: GPU checks in build will likely fail. The container must be run with --gpus all"
@@ -57,6 +71,7 @@ RUN echo '#!/bin/bash' > /entrypoint.sh && \
     echo 'echo "TensorFlow GPU Container"' >> /entrypoint.sh && \
     echo 'echo "====================================================="' >> /entrypoint.sh && \
     echo 'echo "To verify GPU access, run: python /app/check_gpu.py"' >> /entrypoint.sh && \
+    echo 'echo "To run benchmarks, run: /app/run_benchmark.sh"' >> /entrypoint.sh && \
     echo 'echo "If no GPU is detected, ensure you:"' >> /entrypoint.sh && \
     echo 'echo "1. Have NVIDIA drivers installed on the host"' >> /entrypoint.sh && \
     echo 'echo "2. Installed nvidia-container-toolkit on the host"' >> /entrypoint.sh && \
