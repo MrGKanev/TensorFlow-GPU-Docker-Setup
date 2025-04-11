@@ -39,7 +39,6 @@ COPY test_gpu.py /app/test_gpu.py
 COPY tensorflow_pycharm_fix.py /app/tensorflow_pycharm_fix.py
 COPY check_gpu.py /app/check_gpu.py
 COPY tensorflow_benchmark.py /app/tensorflow_benchmark.py
-COPY tensorflow_benchmark_quick.py /app/tensorflow_benchmark_quick.py
 COPY run_benchmark.sh /app/run_benchmark.sh
 
 # Make scripts executable
@@ -47,11 +46,7 @@ RUN chmod +x /app/test_gpu.py
 RUN chmod +x /app/tensorflow_pycharm_fix.py
 RUN chmod +x /app/check_gpu.py
 RUN chmod +x /app/tensorflow_benchmark.py
-RUN chmod +x /app/tensorflow_benchmark_quick.py
 RUN chmod +x /app/run_benchmark.sh
-
-# Create directory for benchmark results
-RUN mkdir -p /app/benchmark_results && chmod 777 /app/benchmark_results
 
 # Verify TensorFlow can use the GPU
 RUN echo "Note: GPU checks in build will likely fail. The container must be run with --gpus all"
