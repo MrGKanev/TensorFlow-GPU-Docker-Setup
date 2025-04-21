@@ -36,8 +36,11 @@ ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64:${LD_LIBRARY_PATH}"
 # Copy test scripts
 COPY test_gpu.py /app/test_gpu.py
 COPY tensorflow_pycharm_fix.py /app/tensorflow_pycharm_fix.py
+COPY tf_benchmark.py /app/tf_benchmark.py
+RUN chmod +x /app/tf_benchmark.py
 RUN chmod +x /app/test_gpu.py
 RUN chmod +x /app/tensorflow_pycharm_fix.py
+
 
 # Verify TensorFlow can use the GPU
 RUN echo "Note: GPU checks in build will likely fail. The container must be run with --gpus all"

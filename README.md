@@ -48,6 +48,24 @@ The Docker image includes the following packages:
 - scikit-learn
 - CUDA and cuDNN libraries
 
+## Benchmarks
+
+### Usage
+
+```bash
+# Simple run (all benchmarks, standard sizes)
+python tf_simple_benchmark.py
+
+# Quick run with smaller sizes
+python tf_simple_benchmark.py --small
+
+# Run specific benchmarks
+python tf_simple_benchmark.py --matrix  # Matrix multiplication only
+python tf_simple_benchmark.py --dense   # Dense layer only
+python tf_simple_benchmark.py --conv    # Convolution only
+```
+
+
 ## Detailed Setup Instructions
 
 ### 1. Build the Docker Image
