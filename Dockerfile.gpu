@@ -7,6 +7,23 @@ LABEL maintainer="mail@gkanev.com"
 LABEL version="1.0"
 LABEL description="TensorFlow GPU image with additional tools for ML"
 
+# Additional NVIDIA environment variables for better performance
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
+ENV TF_FORCE_GPU_ALLOW_GROWTH=true
+ENV TF_XLA_FLAGS=--tf_xla_enable_xla_devices
+
+# Set better defaults for TensorFlow performance
+ENV TF_GPU_THREAD_MODE=gpu_private
+ENV TF_GPU_THREAD_COUNT=1
+
+# cuDNN configuration for better performance
+ENV TF_CUDNN_RESET_RND_GEN_STATE=false
+ENV TF_USE_CUDNN_AUTOTUNE=1
+
+# Set memory allocation to avoid OOM errors
+ENV TF_FORCE_UNIFIED_MEMORY=1
+
 # Set a working directory
 WORKDIR /app
 
@@ -37,10 +54,11 @@ ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64:${LD_LIBRARY_PATH}"
 COPY test_gpu.py /app/test_gpu.py
 COPY tensorflow_pycharm_fix.py /app/tensorflow_pycharm_fix.py
 COPY tf_benchmark.py /app/tf_benchmark.py
+COPY check_gpu.py /app/check_gpu.py
 RUN chmod +x /app/tf_benchmark.py
 RUN chmod +x /app/test_gpu.py
 RUN chmod +x /app/tensorflow_pycharm_fix.py
-
+RUN chmod +x /app/check_gpu.py
 
 # Verify TensorFlow can use the GPU
 RUN echo "Note: GPU checks in build will likely fail. The container must be run with --gpus all"

@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  tensorflow-gpu:
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+    container_name: tensorflow-gpu-custom
+    # Deploy section is required for GPU resource allocation in Docker Compose
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    volumes:
+      # Mount your local code/data directories here
+      - ./:/app
+    # These environment variables can be overridden at runtime
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - TF_FORCE_GPU_ALLOW_GROWTH=true
+    # Keeps container running
+    tty: true
+    stdin_open: true
