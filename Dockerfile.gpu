@@ -1,5 +1,5 @@
 # Use the official TensorFlow GPU image with a specific version 
-FROM tensorflow/tensorflow:2.11.0-gpu
+FROM tensorflow/tensorflow:2.11.0-gpu-jupyter
 
 # Set image metadata
 LABEL name="tensorflow-gpu-custom"
@@ -27,26 +27,12 @@ ENV TF_FORCE_UNIFIED_MEMORY=1
 # Set a working directory
 WORKDIR /app
 
-# Install system dependencies and clean up in the same layer
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    wget \
-    curl \
-    git \
-    build-essential \
-    libhdf5-dev \
-    libhdf5-serial-dev \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
-
-# Upgrade pip and install required Python packages in a single layer
-# This creates fewer layers and allows better cleanup
+# Install additional packages
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir \
-    numpy \
     pandas \
     scikit-learn \
     matplotlib \
-    h5py \
     && find /usr/local/lib/python3.* -name __pycache__ -type d -exec rm -rf {} +
 
 # Add CUDA Path environment variables
@@ -62,18 +48,6 @@ RUN chmod +x /app/tf_benchmark.py
 RUN chmod +x /app/test_gpu.py
 RUN chmod +x /app/tensorflow_pycharm_fix.py
 RUN chmod +x /app/check_gpu.py
-
-# Verify TensorFlow can use the GPU
-RUN echo "Note: GPU checks in build will likely fail. The container must be run with --gpus all"
-
-# Final cleanup to reduce image size
-RUN apt-get autoremove -y && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* && \
-    rm -rf /root/.cache && \
-    rm -rf /tmp/* && \
-    find /usr/local/lib/python3.* -name '*.pyc' -delete && \
-    find /usr/local/lib/python3.* -name '*.so' -exec strip -s {} \; || true
 
 # Add a helpful message when container starts
 RUN echo '#!/bin/bash' > /entrypoint.sh && \
