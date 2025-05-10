@@ -1,10 +1,10 @@
 # Use the official TensorFlow GPU image with a specific version 
-FROM tensorflow/tensorflow:2.11.0-gpu
+FROM tensorflow/tensorflow:2.11.0-gpu-jupyter
 
 # Set image metadata
 LABEL name="tensorflow-gpu-custom"
 LABEL maintainer="mail@gkanev.com"
-LABEL version="1.0"
+LABEL version="1.2"
 LABEL description="TensorFlow GPU image with additional tools for ML"
 
 # Additional NVIDIA environment variables for better performance
@@ -27,19 +27,36 @@ ENV TF_FORCE_UNIFIED_MEMORY=1
 # Set a working directory
 WORKDIR /app
 
-# Install system dependencies and clean up in the same layer
+# Install system dependencies including SSH server for PyCharm and tools for VS Code
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     curl \
     git \
     build-essential \
-    libhdf5-dev \
-    libhdf5-serial-dev \
+    openssh-server \
+    python3-dev \
+    python3-pip \
+    python3-venv \
+    sudo \
+    # For VS Code Remote Development
+    gnupg2 \
+    lsb-release \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Upgrade pip and install required Python packages in a single layer
-# This creates fewer layers and allows better cleanup
+# Configure SSH for PyCharm remote interpreter
+RUN mkdir /var/run/sshd
+RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+RUN echo 'root:tfgpu' | chpasswd
+
+# Create a non-root user for VS Code (recommended by VS Code)
+RUN groupadd --gid 1000 vscode \
+    && useradd --uid 1000 --gid 1000 -m vscode \
+    && echo "vscode:vscode" | chpasswd \
+    && usermod -aG sudo vscode \
+    && echo "vscode ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/vscode
+
+# Upgrade pip and install Python packages
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir \
     numpy \
@@ -47,44 +64,49 @@ RUN pip install --no-cache-dir --upgrade pip && \
     scikit-learn \
     matplotlib \
     h5py \
+    ipykernel \
+    pytest \
+    pylint \
+    debugpy \
+    tqdm \
+    jupyter \
+    # VS Code Python extension dependencies
+    pylint \
+    autopep8 \
+    black \
+    yapf \
+    mypy \
+    pydocstyle \
     && find /usr/local/lib/python3.* -name __pycache__ -type d -exec rm -rf {} +
 
 # Add CUDA Path environment variables
 ENV PATH="/usr/local/cuda/bin:${PATH}"
 ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64:${LD_LIBRARY_PATH}"
 
-# Copy test scripts
+# Copy benchmark and test scripts
 COPY test_gpu.py /app/test_gpu.py
 COPY tensorflow_pycharm_fix.py /app/tensorflow_pycharm_fix.py
 COPY tf_benchmark.py /app/tf_benchmark.py
 COPY check_gpu.py /app/check_gpu.py
-RUN chmod +x /app/tf_benchmark.py
-RUN chmod +x /app/test_gpu.py
-RUN chmod +x /app/tensorflow_pycharm_fix.py
-RUN chmod +x /app/check_gpu.py
+COPY ide_setup.py /app/ide_setup.py
+COPY .vscode /app/.vscode
+RUN chmod +x /app/*.py
 
-# Verify TensorFlow can use the GPU
-RUN echo "Note: GPU checks in build will likely fail. The container must be run with --gpus all"
+# Create directory for project mappings
+RUN mkdir -p /app/projects
+RUN chmod 777 /app/projects
 
-# Final cleanup to reduce image size
-RUN apt-get autoremove -y && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* && \
-    rm -rf /root/.cache && \
-    rm -rf /tmp/* && \
-    find /usr/local/lib/python3.* -name '*.pyc' -delete && \
-    find /usr/local/lib/python3.* -name '*.so' -exec strip -s {} \; || true
-
-# Add a helpful message when container starts
+# Create startup script that handles both SSH for PyCharm and VS Code
 RUN echo '#!/bin/bash' > /entrypoint.sh && \
+    echo 'if [ "$START_SSH" = "true" ]; then' >> /entrypoint.sh && \
+    echo '  service ssh start' >> /entrypoint.sh && \
+    echo '  echo "SSH server started for IDE integration"' >> /entrypoint.sh && \
+    echo 'fi' >> /entrypoint.sh && \
     echo 'echo "====================================================="' >> /entrypoint.sh && \
-    echo 'echo "TensorFlow GPU Container"' >> /entrypoint.sh && \
+    echo 'echo "TensorFlow GPU Container with IDE Integration"' >> /entrypoint.sh && \
     echo 'echo "====================================================="' >> /entrypoint.sh && \
     echo 'echo "To verify GPU access, run: python /app/check_gpu.py"' >> /entrypoint.sh && \
-    echo 'echo "If no GPU is detected, ensure you:"' >> /entrypoint.sh && \
-    echo 'echo "1. Have NVIDIA drivers installed on the host"' >> /entrypoint.sh && \
-    echo 'echo "2. Installed nvidia-container-toolkit on the host"' >> /entrypoint.sh && \
-    echo 'echo "3. Started the container with: --gpus all flag"' >> /entrypoint.sh && \
+    echo 'echo "For IDE setup, run: python /app/ide_setup.py"' >> /entrypoint.sh && \
     echo 'echo "====================================================="' >> /entrypoint.sh && \
     echo 'exec "$@"' >> /entrypoint.sh && \
     chmod +x /entrypoint.sh

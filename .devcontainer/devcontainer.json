@@ -1,0 +1,20 @@
+{
+  "name": "TensorFlow GPU Development",
+  "dockerComposeFile": ["../docker-compose.yml"],
+  "service": "tensorflow-gpu",
+  "workspaceFolder": "/app/projects",
+  "settings": {
+    "terminal.integrated.shell.linux": "/bin/bash",
+    "python.defaultInterpreterPath": "/usr/bin/python3",
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": true,
+    "python.formatting.provider": "black"
+  },
+  "extensions": [
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-toolsai.jupyter",
+    "njpwerner.autodocstring"
+  ],
+  "remoteUser": "vscode"
+}

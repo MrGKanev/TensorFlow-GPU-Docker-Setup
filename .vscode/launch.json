@@ -1,0 +1,30 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python: Current File",
+      "type": "python",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}:/app"
+      }
+    },
+    {
+      "name": "Python: TensorFlow GPU Test",
+      "type": "python",
+      "request": "launch",
+      "program": "/app/check_gpu.py",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Python: TensorFlow Benchmark",
+      "type": "python",
+      "request": "launch",
+      "program": "/app/tf_benchmark.py",
+      "console": "integratedTerminal",
+      "args": ["--small"]
+    }
+  ]
+}
