@@ -4,8 +4,8 @@ FROM tensorflow/tensorflow:2.11.0-gpu-jupyter
 # Set image metadata
 LABEL name="tensorflow-gpu-custom"
 LABEL maintainer="mail@gkanev.com"
-LABEL version="1.2"
-LABEL description="TensorFlow GPU image with additional tools for ML"
+LABEL version="1.1"
+LABEL description="TensorFlow GPU image with SSH support for PyCharm and VS Code integration"
 
 # Additional NVIDIA environment variables for better performance
 ENV NVIDIA_VISIBLE_DEVICES=all
@@ -27,89 +27,85 @@ ENV TF_FORCE_UNIFIED_MEMORY=1
 # Set a working directory
 WORKDIR /app
 
-# Install system dependencies including SSH server for PyCharm and tools for VS Code
+# Install SSH server and required packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    wget \
-    curl \
-    git \
-    build-essential \
     openssh-server \
     python3-dev \
-    python3-pip \
-    python3-venv \
-    sudo \
-    # For VS Code Remote Development
-    gnupg2 \
-    lsb-release \
+    build-essential \
+    gdb \
+    rsync \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Configure SSH for PyCharm remote interpreter
-RUN mkdir /var/run/sshd
-RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
-RUN echo 'root:tfgpu' | chpasswd
-
-# Create a non-root user for VS Code (recommended by VS Code)
-RUN groupadd --gid 1000 vscode \
-    && useradd --uid 1000 --gid 1000 -m vscode \
-    && echo "vscode:vscode" | chpasswd \
-    && usermod -aG sudo vscode \
-    && echo "vscode ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/vscode
-
-# Upgrade pip and install Python packages
+# Install additional Python packages
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir \
-    numpy \
     pandas \
     scikit-learn \
     matplotlib \
-    h5py \
-    ipykernel \
+    pylint \
     pytest \
-    pylint \
-    debugpy \
-    tqdm \
-    jupyter \
-    # VS Code Python extension dependencies
-    pylint \
-    autopep8 \
-    black \
-    yapf \
-    mypy \
-    pydocstyle \
     && find /usr/local/lib/python3.* -name __pycache__ -type d -exec rm -rf {} +
 
 # Add CUDA Path environment variables
 ENV PATH="/usr/local/cuda/bin:${PATH}"
 ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64:${LD_LIBRARY_PATH}"
 
-# Copy benchmark and test scripts
+# Configure SSH server for password authentication only
+RUN mkdir -p /var/run/sshd && \
+    # Enable root login with password
+    sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config && \
+    # Ensure password authentication is enabled
+    sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config && \
+    # Explicitly disable public key authentication
+    sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication no/' /etc/ssh/sshd_config && \
+    # Set the root password
+    echo 'root:tensorflowgpu' | chpasswd && \
+    # SSH login fix for "no password" issue
+    sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd
+
+# Copy test scripts
 COPY test_gpu.py /app/test_gpu.py
 COPY tensorflow_pycharm_fix.py /app/tensorflow_pycharm_fix.py
 COPY tf_benchmark.py /app/tf_benchmark.py
 COPY check_gpu.py /app/check_gpu.py
-COPY ide_setup.py /app/ide_setup.py
-COPY .vscode /app/.vscode
-RUN chmod +x /app/*.py
+RUN chmod +x /app/tf_benchmark.py
+RUN chmod +x /app/test_gpu.py
+RUN chmod +x /app/tensorflow_pycharm_fix.py
+RUN chmod +x /app/check_gpu.py
 
-# Create directory for project mappings
-RUN mkdir -p /app/projects
-RUN chmod 777 /app/projects
+# Create a directory for IDE-specific configurations
+RUN mkdir -p /app/ide_helpers && \
+    echo '{"python.linting.enabled": true, "python.linting.pylintEnabled": true}' > /app/ide_helpers/vscode_settings.json
 
-# Create startup script that handles both SSH for PyCharm and VS Code
+# Add a custom entrypoint script to start SSH and provide helpful info
 RUN echo '#!/bin/bash' > /entrypoint.sh && \
-    echo 'if [ "$START_SSH" = "true" ]; then' >> /entrypoint.sh && \
-    echo '  service ssh start' >> /entrypoint.sh && \
-    echo '  echo "SSH server started for IDE integration"' >> /entrypoint.sh && \
-    echo 'fi' >> /entrypoint.sh && \
     echo 'echo "====================================================="' >> /entrypoint.sh && \
-    echo 'echo "TensorFlow GPU Container with IDE Integration"' >> /entrypoint.sh && \
+    echo 'echo "TensorFlow GPU Container with SSH Support"' >> /entrypoint.sh && \
     echo 'echo "====================================================="' >> /entrypoint.sh && \
+    echo 'echo "SSH Server running on port 2222"' >> /entrypoint.sh && \
+    echo 'echo "Username: root"' >> /entrypoint.sh && \
+    echo 'echo "Password: tensorflowgpu"' >> /entrypoint.sh && \
+    echo 'echo ""' >> /entrypoint.sh && \
     echo 'echo "To verify GPU access, run: python /app/check_gpu.py"' >> /entrypoint.sh && \
-    echo 'echo "For IDE setup, run: python /app/ide_setup.py"' >> /entrypoint.sh && \
+    echo 'echo ""' >> /entrypoint.sh && \
+    echo 'echo "If no GPU is detected, ensure you:"' >> /entrypoint.sh && \
+    echo 'echo "1. Have NVIDIA drivers installed on the host"' >> /entrypoint.sh && \
+    echo 'echo "2. Installed nvidia-container-toolkit on the host"' >> /entrypoint.sh && \
+    echo 'echo "3. Started the container with: --gpus all flag"' >> /entrypoint.sh && \
     echo 'echo "====================================================="' >> /entrypoint.sh && \
+    echo '# Ensure password authentication is enabled' >> /entrypoint.sh && \
+    echo 'sed -i "s/#PasswordAuthentication yes/PasswordAuthentication yes/" /etc/ssh/sshd_config' >> /entrypoint.sh && \
+    echo 'sed -i "s/PasswordAuthentication no/PasswordAuthentication yes/" /etc/ssh/sshd_config' >> /entrypoint.sh && \
+    echo 'echo "SSH password authentication enabled"' >> /entrypoint.sh && \
+    echo '# Start SSH server' >> /entrypoint.sh && \
+    echo '/usr/sbin/sshd' >> /entrypoint.sh && \
+    echo '# Execute the command passed to docker run' >> /entrypoint.sh && \
     echo 'exec "$@"' >> /entrypoint.sh && \
     chmod +x /entrypoint.sh
+
+# Expose SSH port
+EXPOSE 22
 
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["bash"]

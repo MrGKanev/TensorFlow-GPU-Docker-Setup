@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile.gpu
     container_name: tensorflow-gpu-custom
-    # Deploy section for GPU resource allocation in Docker Compose
+    # Deploy section is required for GPU resource allocation in Docker Compose
     deploy:
       resources:
         reservations:
@@ -15,32 +15,19 @@ services:
               count: all
               capabilities: [gpu]
     ports:
-      # Expose SSH port for PyCharm
+      # Map SSH port for IDE integration
       - "2222:22"
-      # Expose additional ports for Jupyter and TensorBoard
-      - "8888:8888"  # Jupyter
-      - "6006:6006"  # TensorBoard
+      # Optional: Map Jupyter port if needed
+      - "8888:8888"
     volumes:
-      # Mount project directory
+      # Mount your local code/data directories here
       - ./:/app
-      # Mount a persistent volume for model data
-      - tensorflow-data:/app/data
-      # Mount VS Code server to preserve extensions (for VS Code Remote Containers)
-      - vscode-server:/home/vscode/.vscode-server
+    # These environment variables can be overridden at runtime
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - TF_FORCE_GPU_ALLOW_GROWTH=true
-      # Set to 'true' to enable SSH for PyCharm remote interpreter
-      - START_SSH=true
-      # Custom environment variables for IDE integration
-      - PYTHONUNBUFFERED=1
-      - PYTHONIOENCODING=UTF-8
+      # Add Python path for IDE debugging
+      - PYTHONPATH=/app
     # Keeps container running
     tty: true
     stdin_open: true
-
-volumes:
-  tensorflow-data:
-    # Persistent volume for model data, datasets, etc.
-  vscode-server:
-    # Persists VS Code Server data between container restarts
