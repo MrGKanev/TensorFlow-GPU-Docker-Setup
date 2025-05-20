@@ -33,7 +33,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pandas \
     scikit-learn \
     matplotlib \
-    pydot \
+    pydot==2.0.0 \
     graphviz \
     && find /usr/local/lib/python3.* -name __pycache__ -type d -exec rm -rf {} +
 
