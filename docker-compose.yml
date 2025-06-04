@@ -33,6 +33,7 @@ services:
     ports:
       - "8888:8888"  # Jupyter
       - "6006:6006"  # TensorBoard
+      - "2222:22"  # SSH access
     # Override default command to keep running
     command: tail -f /dev/null
     # Restart policy
