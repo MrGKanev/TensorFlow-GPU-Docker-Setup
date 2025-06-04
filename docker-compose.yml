@@ -15,12 +15,29 @@ services:
               count: all
               capabilities: [gpu]
     volumes:
-      # Mount your local code/data directories here
+      # Mount your project directory
       - ./:/app
-    # These environment variables can be overridden at runtime
+      # Cache pip packages for faster rebuilds
+      - pip-cache:/root/.cache/pip
+      # Persist Python packages installed via pip install
+      - python-packages:/usr/local/lib/python3.8/site-packages/user-packages
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - TF_FORCE_GPU_ALLOW_GROWTH=true
-    # Keeps container running
+      # Add Python path for user packages
+      - PYTHONPATH=/usr/local/lib/python3.8/site-packages/user-packages:$PYTHONPATH
+    # Keep container running indefinitely
     tty: true
     stdin_open: true
+    # Optional: expose ports for Jupyter/debugging
+    ports:
+      - "8888:8888"  # Jupyter
+      - "6006:6006"  # TensorBoard
+    # Override default command to keep running
+    command: tail -f /dev/null
+    # Restart policy
+    restart: unless-stopped
+
+volumes:
+  pip-cache:
+  python-packages:
