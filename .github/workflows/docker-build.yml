@@ -92,7 +92,7 @@ jobs:
         run: |
           docker run --gpus all --rm \
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
-            python check_gpu.py
+            python scripts/check_gpu.py
 
       - name: Run benchmarks
         run: |
