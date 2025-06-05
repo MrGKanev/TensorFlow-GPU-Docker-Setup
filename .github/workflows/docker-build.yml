@@ -1,113 +1,43 @@
-name: Enhanced Docker Build & Test
+name: Build and Push Docker Image
 
 on:
   push:
-    branches: [ master, develop ]
+    branches: [ master ]
+    paths:
+      - 'Dockerfile.gpu'
+      - '.github/workflows/docker-build.yml'
+      - '**.py'
   pull_request:
     branches: [ master ]
   workflow_dispatch:
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: mrgkanev/tensorflow-gpu-custom
-
 jobs:
-  security-scan:
+  build-and-push:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-          
-      - name: Upload Trivy scan results
-        uses: github/codeql-action/upload-sarif@v2
-        if: always()
-        with:
-          sarif_file: 'trivy-results.sarif'
+    permissions:
+      contents: read
+      packages: write
 
-  build-test:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        dockerfile: [Dockerfile.gpu, Dockerfile.production]
-        platform: [linux/amd64]
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v2
 
-      - name: Login to Container Registry
-        uses: docker/login-action@v3
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
         with:
-          registry: ${{ env.REGISTRY }}
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
-
       - name: Build and push
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v4
         with:
           context: .
-          file: ./${{ matrix.dockerfile }}
-          platforms: ${{ matrix.platform }}
+          file: ./Dockerfile.gpu
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Test image
-        run: |
-          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} python -c "
-          import tensorflow as tf
-          print(f'TensorFlow version: {tf.__version__}')
-          print(f'CUDA available: {tf.test.is_built_with_cuda()}')
-          print('✅ Basic import test passed')
-          "
-
-  gpu-test:
-    runs-on: [self-hosted, gpu]
-    if: github.event_name != 'pull_request'
-    needs: build-test
-    steps:
-      - name: Test GPU functionality
-        run: |
-          docker run --gpus all --rm \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
-            python scripts/check_gpu.py
-
-      - name: Run benchmarks
-        run: |
-          docker run --gpus all --rm \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
-            python tf_benchmark.py --small
-
-  dependency-check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Run Snyk to check for vulnerabilities
-        uses: snyk/actions/python@master
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          args: --file=requirements.txt --severity-threshold=high
+          tags: |
+            ghcr.io/mrgkanev/tensorflow-gpu-custom:latest
+            ghcr.io/mrgkanev/tensorflow-gpu-custom:2.11.0
