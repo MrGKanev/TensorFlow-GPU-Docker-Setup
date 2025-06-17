@@ -1,0 +1,142 @@
+{
+  "name": "TensorFlow GPU Development Environment",
+  "dockerComposeFile": [
+    "../docker-compose.yml",
+    "docker-compose.devcontainer.yml"
+  ],
+  "service": "tensorflow-gpu",
+  "workspaceFolder": "/app",
+  "shutdownAction": "stopCompose",
+  // Configure tool-specific properties.
+  "customizations": {
+    // Configure properties specific to VS Code.
+    "vscode": {
+      // Set *default* container specific settings.json values on container create.
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/bin/python3",
+        "python.linting.enabled": true,
+        "python.linting.pylintEnabled": true,
+        "python.formatting.autopep8Path": "/usr/local/bin/autopep8",
+        "python.formatting.blackPath": "/usr/local/bin/black",
+        "python.formatting.provider": "black",
+        "python.linting.flake8Enabled": true,
+        "python.linting.mypyEnabled": true,
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.organizeImports": "explicit"
+        },
+        "files.exclude": {
+          "**/__pycache__": true,
+          "**/.pytest_cache": true,
+          "**/.*cache": true
+        },
+        "python.terminal.activateEnvironment": false,
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "jupyter.askForKernelRestart": false,
+        "jupyter.interactiveWindow.textEditor.executeSelection": true,
+        "files.watcherExclude": {
+          "**/data/**": true,
+          "**/datasets/**": true,
+          "**/.git/objects/**": true,
+          "**/.git/subtree-cache/**": true,
+          "**/node_modules/*/**": true
+        }
+      },
+      // Add the IDs of extensions you want installed when the container is created.
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.flake8",
+        "ms-python.black-formatter",
+        "ms-toolsai.jupyter",
+        "ms-toolsai.jupyter-keymap",
+        "ms-toolsai.jupyter-renderers",
+        "ms-toolsai.vscode-jupyter-cell-tags",
+        "ms-toolsai.vscode-jupyter-slideshow",
+        "charliermarsh.ruff",
+        "njpwerner.autodocstring",
+        "ms-vscode.vscode-json",
+        "redhat.vscode-yaml",
+        "ms-vscode-remote.remote-containers",
+        "github.vscode-pull-request-github",
+        "eamodio.gitlens",
+        "donjayamanne.githistory",
+        "ms-vscode.vscode-github-issue-notebooks",
+        "github.copilot",
+        "github.copilot-chat",
+        "ms-vscode.hexdump",
+        "ms-vscode.vscode-github-issue-notebooks"
+      ]
+    }
+  },
+  // Features to add to the dev container. More info: https://containers.dev/features.
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "configureZshAsDefaultShell": true,
+      "installOhMyZsh": true,
+      "username": "vscode",
+      "userUid": "1000",
+      "userGid": "1000"
+    },
+    "ghcr.io/devcontainers/features/git:1": {
+      "ppa": true,
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {
+      "installDirectlyFromGitHubRelease": true,
+      "version": "latest"
+    }
+  },
+  // Use 'forwardPorts' to make a list of ports inside the container available locally.
+  "forwardPorts": [
+    8888, // Jupyter
+    6006, // TensorBoard
+    8080, // HTTP server
+    5000 // Flask development server
+  ],
+  // Configure port attributes
+  "portsAttributes": {
+    "8888": {
+      "label": "Jupyter Lab",
+      "onAutoForward": "notify"
+    },
+    "6006": {
+      "label": "TensorBoard",
+      "onAutoForward": "silent"
+    },
+    "8080": {
+      "label": "HTTP Server",
+      "onAutoForward": "silent"
+    },
+    "5000": {
+      "label": "Flask Dev Server",
+      "onAutoForward": "silent"
+    }
+  },
+  // Use 'postCreateCommand' to run commands after the container is created.
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  // Configure tool-specific properties.
+  "remoteUser": "vscode",
+  // Set environment variables
+  "containerEnv": {
+    "PYTHONPATH": "/app",
+    "JUPYTER_ENABLE_LAB": "yes",
+    "JUPYTER_TOKEN": "development",
+    "TF_CPP_MIN_LOG_LEVEL": "1"
+  },
+  // Mount the Docker socket to enable docker commands from within the container
+  "mounts": [
+    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind",
+    "source=${localWorkspaceFolder}/.devcontainer/bash_history,target=/home/vscode/.bash_history,type=bind,consistency=cached"
+  ],
+  // Enable GPU access
+  "runArgs": [
+    "--gpus=all",
+    "--shm-size=2g"
+  ],
+  // Uncomment to connect as an existing user other than the container default. More info: https://aka.ms/dev-containers-non-root.
+  "remoteUser": "vscode",
+  // Use 'initializeCommand' to run commands on the host before the container starts
+  "initializeCommand": "bash .devcontainer/pre-build.sh"
+}
