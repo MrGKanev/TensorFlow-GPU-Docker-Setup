@@ -34,6 +34,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
     scikit-learn \
     matplotlib \
     pydot==2.0.0 \
+    openpyxl \
     graphviz \
     && find /usr/local/lib/python3.* -name __pycache__ -type d -exec rm -rf {} +
 
