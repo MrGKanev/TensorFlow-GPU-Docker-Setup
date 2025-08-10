@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   tensorflow-gpu:
     build:
@@ -25,7 +23,7 @@ services:
       - NVIDIA_VISIBLE_DEVICES=all
       - TF_FORCE_GPU_ALLOW_GROWTH=true
       # Add Python path for user packages
-      - PYTHONPATH=/usr/local/lib/python3.8/site-packages/user-packages:$PYTHONPATH
+      - PYTHONPATH=/usr/local/lib/python3.8/site-packages/user-packages:/app
     # Keep container running indefinitely
     tty: true
     stdin_open: true
@@ -33,7 +31,6 @@ services:
     ports:
       - "8888:8888"  # Jupyter
       - "6006:6006"  # TensorBoard
-      - "2222:22"  # SSH access
     # Override default command to keep running
     command: tail -f /dev/null
     # Restart policy
