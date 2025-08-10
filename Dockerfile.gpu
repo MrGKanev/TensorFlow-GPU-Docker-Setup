@@ -27,15 +27,27 @@ ENV TF_FORCE_UNIFIED_MEMORY=1
 # Set a working directory
 WORKDIR /app
 
+# Install system dependencies for OpenCV and other packages
+RUN apt-get update && apt-get install -y \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install additional packages
 RUN pip install --no-cache-dir --upgrade pip && \
+    pip uninstall -y opencv-python && \
     pip install --no-cache-dir \
     pandas \
     scikit-learn \
     matplotlib \
     pydot==2.0.0 \
     openpyxl \
-    opencv-python \
+    opencv-python-headless \
     pandas-stubs \
     graphviz \
     && find /usr/local/lib/python3.* -name __pycache__ -type d -exec rm -rf {} +
