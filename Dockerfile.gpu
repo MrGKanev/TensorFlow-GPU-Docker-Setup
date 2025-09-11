@@ -1,5 +1,5 @@
 # Use the official TensorFlow GPU image with a specific version 
-FROM tensorflow/tensorflow:2.11.0-gpu-jupyter
+FROM tensorflow/tensorflow:2.15.0-gpu-jupyter as base
 
 # Set image metadata
 LABEL name="tensorflow-gpu-custom"
@@ -7,27 +7,47 @@ LABEL maintainer="mail@gkanev.com"
 LABEL version="1.0"
 LABEL description="TensorFlow GPU image with additional tools for ML"
 
-# Additional NVIDIA environment variables for better performance
+# Build stage for additional packages
+FROM base as builder
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python packages in a virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Production stage
+FROM base as production
+
+# Create non-root user for security
+RUN groupadd -r tensorflow && useradd -r -g tensorflow tensorflow
+
+# Copy virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Set image metadata
+LABEL org.opencontainers.image.title="TensorFlow GPU Custom"
+LABEL org.opencontainers.image.description="Modern TensorFlow GPU container with security best practices"
+LABEL org.opencontainers.image.version="2.0"
+LABEL org.opencontainers.image.authors="mail@gkanev.com"
+LABEL org.opencontainers.image.source="https://github.com/mrgkanev/tensorflow-gpu-docker"
+
+# Modern environment variables
 ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 ENV TF_FORCE_GPU_ALLOW_GROWTH=true
-ENV TF_XLA_FLAGS=--tf_xla_enable_xla_devices
+ENV TF_ENABLE_ONEDNN_OPTS=1
+ENV TF_XLA_FLAGS="--tf_xla_enable_xla_devices --tf_xla_auto_jit=2"
 
-# Set better defaults for TensorFlow performance
-ENV TF_GPU_THREAD_MODE=gpu_private
-ENV TF_GPU_THREAD_COUNT=1
-
-# cuDNN configuration for better performance
-ENV TF_CUDNN_RESET_RND_GEN_STATE=false
-ENV TF_USE_CUDNN_AUTOTUNE=1
-
-# Set memory allocation to avoid OOM errors
-ENV TF_FORCE_UNIFIED_MEMORY=1
-
-# Set a working directory
-WORKDIR /app
-
-# Install system dependencies for OpenCV and other packages
+# Install only runtime dependencies
 RUN apt-get update && apt-get install -y \
     libgl1-mesa-glx \
     libglib2.0-0 \
@@ -35,50 +55,23 @@ RUN apt-get update && apt-get install -y \
     libxext6 \
     libxrender-dev \
     libgomp1 \
-    libglib2.0-0 \
-    && rm -rf /var/lib/apt/lists/*
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
-# Install additional packages
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip uninstall -y opencv-python && \
-    pip install --no-cache-dir \
-    pandas \
-    scikit-learn \
-    matplotlib \
-    pydot==2.0.0 \
-    openpyxl \
-    opencv-python-headless \
-    pandas-stubs \
-    graphviz \
-    && find /usr/local/lib/python3.* -name __pycache__ -type d -exec rm -rf {} +
+# Create app directory and set permissions
+WORKDIR /app
+RUN chown -R tensorflow:tensorflow /app
 
-# Add CUDA Path environment variables
-ENV PATH="/usr/local/cuda/bin:${PATH}"
-ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64:${LD_LIBRARY_PATH}"
+# Copy application files
+COPY --chown=tensorflow:tensorflow . /app/
 
-# Copy test scripts
-COPY test_gpu.py /app/test_gpu.py
-COPY tensorflow_pycharm_fix.py /app/tensorflow_pycharm_fix.py
-COPY tf_benchmark.py /app/tf_benchmark.py
-COPY check_gpu.py /app/check_gpu.py
-RUN chmod +x /app/tf_benchmark.py
-RUN chmod +x /app/test_gpu.py
-RUN chmod +x /app/tensorflow_pycharm_fix.py
-RUN chmod +x /app/check_gpu.py
+# Switch to non-root user
+USER tensorflow
 
-# Add a helpful message when container starts
-RUN echo '#!/bin/bash' > /entrypoint.sh && \
-    echo 'echo "====================================================="' >> /entrypoint.sh && \
-    echo 'echo "TensorFlow GPU Container"' >> /entrypoint.sh && \
-    echo 'echo "====================================================="' >> /entrypoint.sh && \
-    echo 'echo "To verify GPU access, run: python /app/check_gpu.py"' >> /entrypoint.sh && \
-    echo 'echo "If no GPU is detected, ensure you:"' >> /entrypoint.sh && \
-    echo 'echo "1. Have NVIDIA drivers installed on the host"' >> /entrypoint.sh && \
-    echo 'echo "2. Installed nvidia-container-toolkit on the host"' >> /entrypoint.sh && \
-    echo 'echo "3. Started the container with: --gpus all flag"' >> /entrypoint.sh && \
-    echo 'echo "====================================================="' >> /entrypoint.sh && \
-    echo 'exec "$@"' >> /entrypoint.sh && \
-    chmod +x /entrypoint.sh
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import tensorflow as tf; tf.config.list_physical_devices('GPU')" || exit 1
 
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["bash"]

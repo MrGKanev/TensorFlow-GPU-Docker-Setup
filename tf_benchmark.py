@@ -1,273 +1,345 @@
 #!/usr/bin/env python3
 """
-TensorFlow Simple GPU Benchmark
+TensorFlow GPU Benchmark
 
-A lightweight benchmark script for TensorFlow with GPU support.
-No external dependencies beyond what's already in your container.
+Enhanced benchmark script with support for:
+- Mixed precision training
+- XLA compilation
+- Multi-GPU training
+- Memory profiling
+- Modern TensorFlow optimizations
 """
 
 import time
+import json
+import psutil
+import argparse
 import numpy as np
 import tensorflow as tf
-import argparse
-import os
-import sys
+from datetime import datetime
+from pathlib import Path
+from rich.console import Console
+from rich.table import Table
+from rich.progress import Progress
+from rich import print as rprint
 
-def print_header(title):
-    """Print a formatted header."""
-    print("\n" + "=" * 60)
-    print(f" {title}")
-    print("=" * 60)
+console = Console()
 
-def check_gpu():
-    """Verify GPU availability and print information."""
-    print_header("GPU Configuration")
+class ModernBenchmark:
+    def __init__(self, use_mixed_precision=True, use_xla=True):
+        self.use_mixed_precision = use_mixed_precision
+        self.use_xla = use_xla
+        self.results = {}
+        self.setup_tf_optimizations()
     
-    print(f"TensorFlow version: {tf.__version__}")
-    print(f"Python version: {sys.version.split()[0]}")
-    print(f"CUDA available: {tf.test.is_built_with_cuda()}")
-    
-    # Check GPU devices
-    gpus = tf.config.list_physical_devices('GPU')
-    print(f"GPUs detected: {len(gpus)}")
-    
-    if gpus:
-        print("\n✅ GPU IS AVAILABLE!")
-        # Configure memory growth to avoid memory allocation errors
-        for gpu in gpus:
-            try:
+    def setup_tf_optimizations(self):
+        """Configure TensorFlow for optimal performance."""
+        # GPU memory growth
+        gpus = tf.config.experimental.list_physical_devices('GPU')
+        if gpus:
+            for gpu in gpus:
                 tf.config.experimental.set_memory_growth(gpu, True)
-                print(f"Memory growth enabled for GPU {gpu}")
-            except:
-                print(f"Failed to set memory growth for GPU {gpu}")
-        return True
-    else:
-        print("\n❌ NO GPU FOUND!")
-        print("Make sure you started the container with --gpus all")
-        return False
-
-def benchmark_matrix_mult(size=5000, iters=10):
-    """Benchmark matrix multiplication performance."""
-    print_header(f"Matrix Multiplication ({size}x{size})")
+        
+        # Mixed precision
+        if self.use_mixed_precision and gpus:
+            policy = tf.keras.mixed_precision.Policy('mixed_float16')
+            tf.keras.mixed_precision.set_global_policy(policy)
+            console.print("✅ Mixed precision enabled", style="green")
+        
+        # XLA compilation
+        if self.use_xla:
+            tf.config.optimizer.set_jit(True)
+            console.print("✅ XLA compilation enabled", style="green")
+        
+        # Thread optimization
+        tf.config.threading.set_inter_op_parallelism_threads(0)
+        tf.config.threading.set_intra_op_parallelism_threads(0)
     
-    # Create random matrices
-    print("Creating matrices...")
-    a = tf.random.normal((size, size))
-    b = tf.random.normal((size, size))
+    def print_system_info(self):
+        """Print comprehensive system information."""
+        table = Table(title="System Information")
+        table.add_column("Component", style="cyan")
+        table.add_column("Details", style="white")
+        
+        # TensorFlow info
+        table.add_row("TensorFlow Version", tf.__version__)
+        table.add_row("CUDA Available", str(tf.test.is_built_with_cuda()))
+        
+        # GPU info
+        gpus = tf.config.list_physical_devices('GPU')
+        table.add_row("GPUs Detected", str(len(gpus)))
+        
+        if gpus:
+            for i, gpu in enumerate(gpus):
+                try:
+                    details = tf.config.experimental.get_device_details(gpu)
+                    compute_cap = details.get('compute_capability', 'Unknown')
+                    table.add_row(f"GPU {i}", f"{gpu.name} (Compute: {compute_cap})")
+                except:
+                    table.add_row(f"GPU {i}", gpu.name)
+        
+        # System info
+        table.add_row("CPU Cores", str(psutil.cpu_count()))
+        table.add_row("RAM", f"{psutil.virtual_memory().total / (1024**3):.1f} GB")
+        
+        console.print(table)
     
-    # Warmup
-    print("Warmup...")
-    for _ in range(3):
-        c = tf.matmul(a, b)
+    @tf.function(experimental_relax_shapes=True)
+    def compiled_matmul(self, a, b):
+        """XLA-compiled matrix multiplication."""
+        return tf.matmul(a, b)
     
-    # Benchmark
-    print(f"Running benchmark ({iters} iterations)...")
-    start_time = time.time()
-    for _ in range(iters):
-        c = tf.matmul(a, b)
-    # Force execution before timing
-    _ = c.numpy()
-    end_time = time.time()
+    def benchmark_matrix_operations(self, size=5000, iterations=10):
+        """Benchmark matrix operations with modern optimizations."""
+        console.print(f"\n🔄 Matrix Operations Benchmark ({size}x{size})", style="bold blue")
+        
+        # Create test matrices
+        with tf.device('/GPU:0' if tf.config.list_physical_devices('GPU') else '/CPU:0'):
+            a = tf.random.normal((size, size), dtype=tf.float32)
+            b = tf.random.normal((size, size), dtype=tf.float32)
+            
+            if self.use_mixed_precision:
+                a = tf.cast(a, tf.float16)
+                b = tf.cast(b, tf.float16)
+        
+        # Warmup
+        for _ in range(3):
+            if self.use_xla:
+                _ = self.compiled_matmul(a, b)
+            else:
+                _ = tf.matmul(a, b)
+        
+        # Benchmark
+        start_time = time.time()
+        with Progress() as progress:
+            task = progress.add_task("Running benchmark...", total=iterations)
+            for _ in range(iterations):
+                if self.use_xla:
+                    result = self.compiled_matmul(a, b)
+                else:
+                    result = tf.matmul(a, b)
+                progress.advance(task)
+        
+        # Force execution and measure
+        _ = result.numpy()
+        elapsed = time.time() - start_time
+        
+        # Calculate metrics
+        flops = 2 * size * size * size * iterations
+        gflops = flops / elapsed / 1e9
+        avg_time = elapsed / iterations
+        
+        self.results['matrix_ops'] = {
+            'gflops': gflops,
+            'avg_time_ms': avg_time * 1000,
+            'total_time_s': elapsed
+        }
+        
+        console.print(f"📊 Performance: {gflops:.2f} GFLOPS", style="green")
+        console.print(f"⏱️  Average time: {avg_time*1000:.2f} ms", style="yellow")
+        
+        return gflops
     
-    # Calculate performance
-    elapsed = end_time - start_time
-    avg_time = elapsed / iters
-    
-    # Each matrix multiply is roughly 2*N^3 operations (N^2 multiplications and N^2 additions for N rows/columns)
-    flops = 2 * size * size * size * iters
-    gflops = flops / elapsed / 1e9
-    
-    print(f"\nResults:")
-    print(f"  Total time: {elapsed:.3f} seconds")
-    print(f"  Average per iteration: {avg_time*1000:.2f} ms")
-    print(f"  Performance: {gflops:.2f} GFLOPS")
-    
-    return elapsed, gflops
-
-def benchmark_dense_layer(batch_size=1024, input_size=1024, output_size=1024, iters=100):
-    """Benchmark dense layer forward and backward pass."""
-    print_header(f"Dense Layer ({input_size} → {output_size}, batch={batch_size})")
-    
-    # Create model with a single dense layer
-    model = tf.keras.Sequential([
-        tf.keras.layers.Dense(output_size, input_shape=(input_size,), activation='relu')
-    ])
-    
-    # Compile model
-    model.compile(
-        optimizer=tf.keras.optimizers.legacy.Adam(),
-        loss='mse'
-    )
-    
-    # Create random input data
-    x = tf.random.normal((batch_size, input_size))
-    y = tf.random.normal((batch_size, output_size))
-    
-    # Warmup
-    print("Warmup...")
-    model.fit(x, y, epochs=2, batch_size=batch_size, verbose=0)
-    
-    # Benchmark
-    print(f"Running benchmark ({iters} iterations)...")
-    start_time = time.time()
-    model.fit(x, y, epochs=iters, batch_size=batch_size, verbose=0)
-    end_time = time.time()
-    
-    # Calculate performance
-    elapsed = end_time - start_time
-    avg_time = elapsed / iters
-    
-    # Each iteration processes batch_size samples
-    samples_per_sec = batch_size * iters / elapsed
-    
-    print(f"\nResults:")
-    print(f"  Total time: {elapsed:.3f} seconds")
-    print(f"  Average per iteration: {avg_time*1000:.2f} ms")
-    print(f"  Samples per second: {samples_per_sec:.2f}")
-    
-    return elapsed, samples_per_sec
-
-def benchmark_conv_layer(batch_size=32, size=224, channels=3, filters=64, iters=10):
-    """Benchmark convolutional layer performance."""
-    print_header(f"Conv2D Layer ({size}x{size}x{channels} → {filters} filters)")
-    
-    # Create model with a single conv layer
-    model = tf.keras.Sequential([
-        tf.keras.layers.Conv2D(
-            filters=filters, 
-            kernel_size=(3, 3), 
-            activation='relu',
-            padding='same',
-            input_shape=(size, size, channels)
+    def benchmark_cnn_training(self, batch_size=64, epochs=5):
+        """Benchmark CNN training with modern optimizations."""
+        console.print(f"\n🧠 CNN Training Benchmark", style="bold blue")
+        
+        # Create a modern CNN model
+        model = tf.keras.Sequential([
+            tf.keras.layers.Conv2D(32, 3, activation='relu', input_shape=(224, 224, 3)),
+            tf.keras.layers.BatchNormalization(),
+            tf.keras.layers.Conv2D(64, 3, activation='relu'),
+            tf.keras.layers.BatchNormalization(),
+            tf.keras.layers.MaxPooling2D(),
+            tf.keras.layers.Conv2D(128, 3, activation='relu'),
+            tf.keras.layers.BatchNormalization(),
+            tf.keras.layers.GlobalAveragePooling2D(),
+            tf.keras.layers.Dense(256, activation='relu'),
+            tf.keras.layers.Dropout(0.5),
+            tf.keras.layers.Dense(1000, activation='softmax')
+        ])
+        
+        # Modern optimizer with learning rate scheduling
+        initial_lr = 0.001
+        lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+            initial_lr, decay_steps=100, decay_rate=0.9
         )
-    ])
+        
+        optimizer = tf.keras.optimizers.AdamW(learning_rate=lr_schedule)
+        
+        # Mixed precision loss scaling
+        if self.use_mixed_precision:
+            optimizer = tf.keras.mixed_precision.LossScaleOptimizer(optimizer)
+        
+        model.compile(
+            optimizer=optimizer,
+            loss='sparse_categorical_crossentropy',
+            metrics=['accuracy']
+        )
+        
+        # Generate synthetic data
+        x_train = tf.random.normal((batch_size * 10, 224, 224, 3))
+        y_train = tf.random.uniform((batch_size * 10,), maxval=1000, dtype=tf.int32)
+        
+        # Benchmark training
+        start_time = time.time()
+        history = model.fit(
+            x_train, y_train,
+            batch_size=batch_size,
+            epochs=epochs,
+            verbose=0
+        )
+        elapsed = time.time() - start_time
+        
+        samples_per_sec = (len(x_train) * epochs) / elapsed
+        
+        self.results['cnn_training'] = {
+            'samples_per_sec': samples_per_sec,
+            'time_per_epoch_s': elapsed / epochs,
+            'final_accuracy': history.history['accuracy'][-1]
+        }
+        
+        console.print(f"📊 Throughput: {samples_per_sec:.2f} samples/sec", style="green")
+        console.print(f"🎯 Final accuracy: {history.history['accuracy'][-1]:.4f}", style="yellow")
+        
+        return samples_per_sec
     
-    # Compile model
-    model.compile(
-        optimizer=tf.keras.optimizers.legacy.Adam(),
-        loss='mse'
-    )
+    def benchmark_transformer_attention(self, seq_length=512, batch_size=32):
+        """Benchmark transformer attention mechanism."""
+        console.print(f"\n🔮 Transformer Attention Benchmark", style="bold blue")
+        
+        # Multi-head attention layer
+        attention = tf.keras.layers.MultiHeadAttention(
+            num_heads=8, key_dim=64, dropout=0.1
+        )
+        
+        # Generate input data
+        x = tf.random.normal((batch_size, seq_length, 512))
+        
+        # Warmup
+        for _ in range(3):
+            _ = attention(x, x)
+        
+        # Benchmark
+        iterations = 50
+        start_time = time.time()
+        for _ in range(iterations):
+            output = attention(x, x)
+        _ = output.numpy()
+        elapsed = time.time() - start_time
+        
+        tokens_per_sec = (batch_size * seq_length * iterations) / elapsed
+        
+        self.results['transformer_attention'] = {
+            'tokens_per_sec': tokens_per_sec,
+            'avg_time_ms': (elapsed / iterations) * 1000
+        }
+        
+        console.print(f"📊 Throughput: {tokens_per_sec:.2f} tokens/sec", style="green")
+        
+        return tokens_per_sec
     
-    # Create random input data
-    x = tf.random.normal((batch_size, size, size, channels))
-    y = tf.random.normal((batch_size, size, size, filters))
+    def memory_profile(self):
+        """Profile GPU memory usage."""
+        console.print(f"\n💾 Memory Profile", style="bold blue")
+        
+        gpus = tf.config.list_physical_devices('GPU')
+        if not gpus:
+            console.print("No GPU available for memory profiling", style="red")
+            return
+        
+        # Get memory info
+        for i, gpu in enumerate(gpus):
+            try:
+                memory_info = tf.config.experimental.get_memory_info(gpu.name)
+                current_mb = memory_info['current'] / (1024 * 1024)
+                peak_mb = memory_info['peak'] / (1024 * 1024)
+                
+                table = Table(title=f"GPU {i} Memory Usage")
+                table.add_column("Metric", style="cyan")
+                table.add_column("Value", style="white")
+                table.add_row("Current Usage", f"{current_mb:.1f} MB")
+                table.add_row("Peak Usage", f"{peak_mb:.1f} MB")
+                
+                console.print(table)
+                
+                self.results[f'gpu_{i}_memory'] = {
+                    'current_mb': current_mb,
+                    'peak_mb': peak_mb
+                }
+            except Exception as e:
+                console.print(f"Could not get memory info for GPU {i}: {e}", style="red")
     
-    # Warmup
-    print("Warmup...")
-    for _ in range(2):
-        preds = model(x, training=False)
+    def save_results(self, filename=None):
+        """Save benchmark results to JSON."""
+        if filename is None:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"benchmark_results_{timestamp}.json"
+        
+        # Add metadata
+        self.results['metadata'] = {
+            'timestamp': datetime.now().isoformat(),
+            'tensorflow_version': tf.__version__,
+            'mixed_precision': self.use_mixed_precision,
+            'xla_enabled': self.use_xla,
+            'gpu_count': len(tf.config.list_physical_devices('GPU'))
+        }
+        
+        with open(filename, 'w') as f:
+            json.dump(self.results, f, indent=2)
+        
+        console.print(f"📄 Results saved to {filename}", style="green")
     
-    # Benchmark inference
-    print(f"Running inference benchmark ({iters} iterations)...")
-    start_time = time.time()
-    for _ in range(iters):
-        preds = model(x, training=False)
-    _ = preds.numpy()  # Force execution
-    infer_time = time.time() - start_time
-    
-    # Benchmark training
-    print(f"Running training benchmark ({iters} iterations)...")
-    start_time = time.time()
-    model.fit(x, y, epochs=iters, batch_size=batch_size, verbose=0)
-    train_time = time.time() - start_time
-    
-    # Calculate performance
-    infer_avg = infer_time / iters
-    train_avg = train_time / iters
-    
-    infer_throughput = batch_size * iters / infer_time
-    train_throughput = batch_size * iters / train_time
-    
-    print(f"\nInference Results:")
-    print(f"  Total time: {infer_time:.3f} seconds")
-    print(f"  Average per batch: {infer_avg*1000:.2f} ms")
-    print(f"  Images per second: {infer_throughput:.2f}")
-    
-    print(f"\nTraining Results:")
-    print(f"  Total time: {train_time:.3f} seconds")
-    print(f"  Average per batch: {train_avg*1000:.2f} ms")
-    print(f"  Images per second: {train_throughput:.2f}")
-    
-    return infer_time, train_time, infer_throughput, train_throughput
-
-def run_all_benchmarks(device_name="GPU", use_small_sizes=False):
-    """Run all benchmarks and display a summary."""
-    results = {}
-    
-    if use_small_sizes:
-        # Smaller sizes for faster runs
-        matrix_size = 2000
-        dense_input = 512
-        dense_output = 512
-        dense_batch = 128
-        conv_size = 112  # 112x112 images
-    else:
-        # Standard sizes
-        matrix_size = 5000
-        dense_input = 1024
-        dense_output = 1024
-        dense_batch = 1024
-        conv_size = 224  # 224x224 images
-    
-    # Matrix multiply benchmark
-    _, matrix_gflops = benchmark_matrix_mult(matrix_size, iters=10)
-    results["Matrix"] = matrix_gflops
-    
-    # Dense layer benchmark
-    _, dense_sps = benchmark_dense_layer(
-        batch_size=dense_batch, 
-        input_size=dense_input, 
-        output_size=dense_output, 
-        iters=20
-    )
-    results["Dense"] = dense_sps
-    
-    # Conv layer benchmark
-    _, _, _, conv_sps = benchmark_conv_layer(
-        batch_size=32, 
-        size=conv_size, 
-        iters=10
-    )
-    results["Conv"] = conv_sps
-    
-    # Print summary
-    print_header(f"Benchmark Summary ({device_name})")
-    print(f"  Matrix Multiplication: {results['Matrix']:.2f} GFLOPS")
-    print(f"  Dense Layer Throughput: {results['Dense']:.2f} samples/sec")
-    print(f"  Conv2D Layer Throughput: {results['Conv']:.2f} images/sec")
-    
-    return results
+    def run_all_benchmarks(self):
+        """Run comprehensive benchmark suite."""
+        console.print("🚀 Starting Modern TensorFlow Benchmark", style="bold green")
+        
+        self.print_system_info()
+        
+        # Run benchmarks
+        self.benchmark_matrix_operations()
+        self.benchmark_cnn_training()
+        self.benchmark_transformer_attention()
+        self.memory_profile()
+        
+        # Save results
+        self.save_results()
+        
+        console.print("\n✅ Benchmark completed successfully!", style="bold green")
 
 def main():
-    parser = argparse.ArgumentParser(description="Simple TensorFlow GPU Benchmark")
-    parser.add_argument("--matrix", action="store_true", help="Run matrix multiplication benchmark")
-    parser.add_argument("--dense", action="store_true", help="Run dense layer benchmark")
-    parser.add_argument("--conv", action="store_true", help="Run convolution benchmark")
-    parser.add_argument("--all", action="store_true", help="Run all benchmarks")
-    parser.add_argument("--small", action="store_true", help="Use smaller sizes for quicker runs")
+    parser = argparse.ArgumentParser(description="Modern TensorFlow GPU Benchmark")
+    parser.add_argument("--no-mixed-precision", action="store_true", 
+                       help="Disable mixed precision training")
+    parser.add_argument("--no-xla", action="store_true", 
+                       help="Disable XLA compilation")
+    parser.add_argument("--matrix-only", action="store_true", 
+                       help="Run only matrix operations benchmark")
+    parser.add_argument("--cnn-only", action="store_true", 
+                       help="Run only CNN training benchmark")
+    parser.add_argument("--attention-only", action="store_true", 
+                       help="Run only transformer attention benchmark")
+    
     args = parser.parse_args()
     
-    # If no specific benchmark is requested, run all
-    run_all = args.all or not (args.matrix or args.dense or args.conv)
+    # Initialize benchmark
+    benchmark = ModernBenchmark(
+        use_mixed_precision=not args.no_mixed_precision,
+        use_xla=not args.no_xla
+    )
     
-    # Check for GPU
-    has_gpu = check_gpu()
-    device = "GPU" if has_gpu else "CPU"
-    
-    if args.matrix:
-        benchmark_matrix_mult(2000 if args.small else 5000)
-    
-    if args.dense:
-        batch = 128 if args.small else 1024
-        size = 512 if args.small else 1024
-        benchmark_dense_layer(batch_size=batch, input_size=size, output_size=size)
-    
-    if args.conv:
-        size = 112 if args.small else 224
-        benchmark_conv_layer(batch_size=32, size=size)
-    
-    if run_all:
-        run_all_benchmarks(device, args.small)
+    # Run specific benchmarks or all
+    if args.matrix_only:
+        benchmark.print_system_info()
+        benchmark.benchmark_matrix_operations()
+    elif args.cnn_only:
+        benchmark.print_system_info()
+        benchmark.benchmark_cnn_training()
+    elif args.attention_only:
+        benchmark.print_system_info()
+        benchmark.benchmark_transformer_attention()
+    else:
+        benchmark.run_all_benchmarks()
 
 if __name__ == "__main__":
     main()

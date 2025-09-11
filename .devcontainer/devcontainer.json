@@ -7,69 +7,6 @@
   "service": "tensorflow-gpu",
   "workspaceFolder": "/app",
   "shutdownAction": "stopCompose",
-  // Configure tool-specific properties.
-  "customizations": {
-    // Configure properties specific to VS Code.
-    "vscode": {
-      // Set *default* container specific settings.json values on container create.
-      "settings": {
-        "python.defaultInterpreterPath": "/usr/bin/python3",
-        "python.linting.enabled": true,
-        "python.linting.pylintEnabled": true,
-        "python.formatting.autopep8Path": "/usr/local/bin/autopep8",
-        "python.formatting.blackPath": "/usr/local/bin/black",
-        "python.formatting.provider": "black",
-        "python.linting.flake8Enabled": true,
-        "python.linting.mypyEnabled": true,
-        "editor.formatOnSave": true,
-        "editor.codeActionsOnSave": {
-          "source.organizeImports": "explicit"
-        },
-        "files.exclude": {
-          "**/__pycache__": true,
-          "**/.pytest_cache": true,
-          "**/.*cache": true
-        },
-        "python.terminal.activateEnvironment": false,
-        "terminal.integrated.defaultProfile.linux": "bash",
-        "jupyter.askForKernelRestart": false,
-        "jupyter.interactiveWindow.textEditor.executeSelection": true,
-        "files.watcherExclude": {
-          "**/data/**": true,
-          "**/datasets/**": true,
-          "**/.git/objects/**": true,
-          "**/.git/subtree-cache/**": true,
-          "**/node_modules/*/**": true
-        }
-      },
-      // Add the IDs of extensions you want installed when the container is created.
-      "extensions": [
-        "ms-python.python",
-        "ms-python.vscode-pylance",
-        "ms-python.flake8",
-        "ms-python.black-formatter",
-        "ms-toolsai.jupyter",
-        "ms-toolsai.jupyter-keymap",
-        "ms-toolsai.jupyter-renderers",
-        "ms-toolsai.vscode-jupyter-cell-tags",
-        "ms-toolsai.vscode-jupyter-slideshow",
-        "charliermarsh.ruff",
-        "njpwerner.autodocstring",
-        "ms-vscode.vscode-json",
-        "redhat.vscode-yaml",
-        "ms-vscode-remote.remote-containers",
-        "github.vscode-pull-request-github",
-        "eamodio.gitlens",
-        "donjayamanne.githistory",
-        "ms-vscode.vscode-github-issue-notebooks",
-        "github.copilot",
-        "github.copilot-chat",
-        "ms-vscode.hexdump",
-        "ms-vscode.vscode-github-issue-notebooks"
-      ]
-    }
-  },
-  // Features to add to the dev container. More info: https://containers.dev/features.
   "features": {
     "ghcr.io/devcontainers/features/common-utils:2": {
       "installZsh": true,
@@ -86,20 +23,105 @@
     "ghcr.io/devcontainers/features/github-cli:1": {
       "installDirectlyFromGitHubRelease": true,
       "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest",
+      "enableNonRootDocker": "true"
+    },
+    "ghcr.io/devcontainers/features/nvidia-cuda:1": {
+      "installToolkit": true
     }
   },
-  // Use 'forwardPorts' to make a list of ports inside the container available locally.
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/opt/venv/bin/python",
+        "python.terminal.activateEnvironment": false,
+        "python.linting.enabled": true,
+        "python.linting.pylintEnabled": false,
+        "python.linting.flake8Enabled": true,
+        "python.formatting.provider": "black",
+        "python.formatting.blackPath": "/opt/venv/bin/black",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.organizeImports": "explicit"
+        },
+        "files.exclude": {
+          "**/__pycache__": true,
+          "**/.pytest_cache": true,
+          "**/.*cache": true,
+          "**/*.pyc": true
+        },
+        "jupyter.askForKernelRestart": false,
+        "jupyter.interactiveWindow.textEditor.executeSelection": true,
+        "notebook.cellToolbarLocation": {
+          "default": "right",
+          "jupyter-notebook": "left"
+        },
+        "files.watcherExclude": {
+          "**/data/**": true,
+          "**/datasets/**": true,
+          "**/.git/objects/**": true,
+          "**/node_modules/*/**": true,
+          "**/models/**": true,
+          "**/checkpoints/**": true
+        },
+        "terminal.integrated.defaultProfile.linux": "zsh",
+        "git.autofetch": true,
+        "git.enableSmartCommit": true,
+        "explorer.confirmDelete": false
+      },
+      "extensions": [
+        // Python & ML
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.black-formatter",
+        "ms-python.flake8",
+        "charliermarsh.ruff",
+        // Jupyter
+        "ms-toolsai.jupyter",
+        "ms-toolsai.jupyter-keymap",
+        "ms-toolsai.jupyter-renderers",
+        "ms-toolsai.vscode-jupyter-cell-tags",
+        "ms-toolsai.vscode-jupyter-slideshow",
+        "ms-toolsai.jupyter-hub",
+        // Development tools
+        "njpwerner.autodocstring",
+        "ms-vscode.vscode-json",
+        "redhat.vscode-yaml",
+        "ms-vscode-remote.remote-containers",
+        "ms-azuretools.vscode-docker",
+        // Git & GitHub
+        "github.vscode-pull-request-github",
+        "eamodio.gitlens",
+        "donjayamanne.githistory",
+        "github.copilot",
+        "github.copilot-chat",
+        // ML specific
+        "ms-vscode.tensorboard",
+        "ms-vscode.vscode-github-issue-notebooks",
+        "wholroyd.jinja",
+        // Utilities
+        "ms-vscode.hexdump",
+        "streetsidesoftware.code-spell-checker",
+        "tamasfe.even-better-toml",
+        "ms-vscode.live-server"
+      ]
+    }
+  },
   "forwardPorts": [
-    8888, // Jupyter
+    8888, // Jupyter Lab
     6006, // TensorBoard
     8080, // HTTP server
-    5000 // Flask development server
+    5000, // Flask dev server
+    8501, // Streamlit
+    7860 // Gradio
   ],
-  // Configure port attributes
   "portsAttributes": {
     "8888": {
       "label": "Jupyter Lab",
-      "onAutoForward": "notify"
+      "onAutoForward": "notify",
+      "requireLocalPort": true
     },
     "6006": {
       "label": "TensorBoard",
@@ -112,31 +134,37 @@
     "5000": {
       "label": "Flask Dev Server",
       "onAutoForward": "silent"
+    },
+    "8501": {
+      "label": "Streamlit App",
+      "onAutoForward": "notify"
+    },
+    "7860": {
+      "label": "Gradio App",
+      "onAutoForward": "notify"
     }
   },
-  // Use 'postCreateCommand' to run commands after the container is created.
   "postCreateCommand": "bash .devcontainer/post-create.sh",
-  // Configure tool-specific properties.
+  "postStartCommand": "bash .devcontainer/post-start.sh",
   "remoteUser": "vscode",
-  // Set environment variables
   "containerEnv": {
     "PYTHONPATH": "/app",
     "JUPYTER_ENABLE_LAB": "yes",
     "JUPYTER_TOKEN": "development",
-    "TF_CPP_MIN_LOG_LEVEL": "1"
+    "TF_CPP_MIN_LOG_LEVEL": "1",
+    "CUDA_VISIBLE_DEVICES": "all",
+    "WANDB_DISABLED": "true"
   },
-  // Mount the Docker socket to enable docker commands from within the container
   "mounts": [
-    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind",
-    "source=${localWorkspaceFolder}/.devcontainer/bash_history,target=/home/vscode/.bash_history,type=bind,consistency=cached"
+    "source=/var/run/docker.sock,target=/var/run/docker-host.sock,type=bind",
+    "source=${localWorkspaceFolder}/.devcontainer/bash_history,target=/home/vscode/.bash_history,type=bind,consistency=cached",
+    "source=${localWorkspaceFolder}/.devcontainer/zsh_history,target=/home/vscode/.zsh_history,type=bind,consistency=cached"
   ],
-  // Enable GPU access
   "runArgs": [
     "--gpus=all",
-    "--shm-size=2g"
+    "--shm-size=2g",
+    "--ipc=host",
+    "--privileged"
   ],
-  // Uncomment to connect as an existing user other than the container default. More info: https://aka.ms/dev-containers-non-root.
-  "remoteUser": "vscode",
-  // Use 'initializeCommand' to run commands on the host before the container starts
   "initializeCommand": "bash .devcontainer/pre-build.sh"
 }
