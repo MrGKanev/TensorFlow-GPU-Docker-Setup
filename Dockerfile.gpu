@@ -1,77 +1,201 @@
 # Use the official TensorFlow GPU image with a specific version 
-FROM tensorflow/tensorflow:2.15.0-gpu-jupyter as base
+FROM tensorflow/tensorflow:2.11.0-gpu-jupyter AS base
 
-# Set image metadata
-LABEL name="tensorflow-gpu-custom"
-LABEL maintainer="mail@gkanev.com"
-LABEL version="1.0"
-LABEL description="TensorFlow GPU image with additional tools for ML"
+# Set environment variables for all stages
+ENV NVIDIA_VISIBLE_DEVICES=all \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility \
+    TF_FORCE_GPU_ALLOW_GROWTH=true \
+    TF_ENABLE_ONEDNN_OPTS=1 \
+    TF_CPP_MIN_LOG_LEVEL=2 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Build stage for additional packages
-FROM base as builder
+# Builder stage - separate from base to avoid circular dependency
+FROM python:3.11-slim AS builder
 
 # Install build dependencies
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    pkg-config \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        pkg-config \
+        curl \
+        git && \
+    rm -rf /var/lib/apt/lists/*
 
-# Install Python packages in a virtual environment
+# Create virtual environment
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy requirements and install packages
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install -r /tmp/requirements.txt && \
+    find /opt/venv -name "*.pyc" -delete && \
+    find /opt/venv -name "*.pyo" -delete && \
+    find /opt/venv -name "__pycache__" -type d -exec rm -rf {} + && \
+    find /opt/venv -name "*.egg-info" -type d -exec rm -rf {} +
 
-# Production stage
-FROM base as production
+# Production stage - back to TensorFlow base
+FROM base AS production
 
-# Create non-root user for security
-RUN groupadd -r tensorflow && useradd -r -g tensorflow tensorflow
-
-# Copy virtual environment from builder
-COPY --from=builder /opt/venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-
-# Set image metadata
-LABEL org.opencontainers.image.title="TensorFlow GPU Custom"
-LABEL org.opencontainers.image.description="Modern TensorFlow GPU container with security best practices"
-LABEL org.opencontainers.image.version="2.0"
-LABEL org.opencontainers.image.authors="mail@gkanev.com"
-LABEL org.opencontainers.image.source="https://github.com/mrgkanev/tensorflow-gpu-docker"
-
-# Modern environment variables
-ENV NVIDIA_VISIBLE_DEVICES=all
-ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
-ENV TF_FORCE_GPU_ALLOW_GROWTH=true
-ENV TF_ENABLE_ONEDNN_OPTS=1
-ENV TF_XLA_FLAGS="--tf_xla_enable_xla_devices --tf_xla_auto_jit=2"
+# Create non-root user
+RUN groupadd --gid 1000 tensorflow && \
+    useradd --uid 1000 --gid tensorflow --create-home --shell /bin/bash tensorflow
 
 # Install only runtime dependencies
-RUN apt-get update && apt-get install -y \
-    libgl1-mesa-glx \
-    libglib2.0-0 \
-    libsm6 \
-    libxext6 \
-    libxrender-dev \
-    libgomp1 \
-    curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        libgl1-mesa-glx \
+        libglib2.0-0 \
+        libsm6 \
+        libxext6 \
+        libxrender-dev \
+        libgomp1 \
+        curl \
+        ca-certificates && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    rm -rf /var/cache/apt/* && \
+    rm -rf /tmp/* && \
+    rm -rf /var/tmp/*
 
-# Create app directory and set permissions
+# Copy virtual environment from builder stage
+COPY --from=builder --chown=tensorflow:tensorflow /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Set working directory
 WORKDIR /app
-RUN chown -R tensorflow:tensorflow /app
 
 # Copy application files
 COPY --chown=tensorflow:tensorflow . /app/
+
+# Create entrypoint script
+RUN echo '#!/bin/bash' > /app/entrypoint.sh && \
+    echo 'set -euo pipefail' >> /app/entrypoint.sh && \
+    echo '' >> /app/entrypoint.sh && \
+    echo 'GREEN="\033[0;32m"' >> /app/entrypoint.sh && \
+    echo 'YELLOW="\033[1;33m"' >> /app/entrypoint.sh && \
+    echo 'RED="\033[0;31m"' >> /app/entrypoint.sh && \
+    echo 'BLUE="\033[0;34m"' >> /app/entrypoint.sh && \
+    echo 'NC="\033[0m"' >> /app/entrypoint.sh && \
+    echo '' >> /app/entrypoint.sh && \
+    echo 'echo -e "${GREEN}🚀 TensorFlow GPU Container v2.0${NC}"' >> /app/entrypoint.sh && \
+    echo 'echo "=================================================="' >> /app/entrypoint.sh && \
+    echo '' >> /app/entrypoint.sh && \
+    echo 'echo -e "${BLUE}ℹ️  Container started at: $(date)${NC}"' >> /app/entrypoint.sh && \
+    echo 'echo -e "${BLUE}ℹ️  Python: $(python --version 2>&1)${NC}"' >> /app/entrypoint.sh && \
+    echo '' >> /app/entrypoint.sh && \
+    echo 'echo -e "${YELLOW}🔍 Checking GPU availability...${NC}"' >> /app/entrypoint.sh && \
+    echo '' >> /app/entrypoint.sh && \
+    echo 'if command -v nvidia-smi >/dev/null 2>&1; then' >> /app/entrypoint.sh && \
+    echo '    if nvidia-smi >/dev/null 2>&1; then' >> /app/entrypoint.sh && \
+    echo '        echo -e "${GREEN}✅ NVIDIA SMI available${NC}"' >> /app/entrypoint.sh && \
+    echo '        GPU_COUNT=$(nvidia-smi -L 2>/dev/null | wc -l || echo 0)' >> /app/entrypoint.sh && \
+    echo '        echo -e "${BLUE}ℹ️  Hardware GPUs detected: $GPU_COUNT${NC}"' >> /app/entrypoint.sh && \
+    echo '    else' >> /app/entrypoint.sh && \
+    echo '        echo -e "${YELLOW}⚠️  nvidia-smi failed to run${NC}"' >> /app/entrypoint.sh && \
+    echo '    fi' >> /app/entrypoint.sh && \
+    echo 'else' >> /app/entrypoint.sh && \
+    echo '        echo -e "${YELLOW}⚠️  nvidia-smi not available${NC}"' >> /app/entrypoint.sh && \
+    echo 'fi' >> /app/entrypoint.sh && \
+    echo '' >> /app/entrypoint.sh && \
+    echo 'echo -e "${YELLOW}🧠 Checking TensorFlow GPU support...${NC}"' >> /app/entrypoint.sh && \
+    echo '' >> /app/entrypoint.sh && \
+    echo 'TF_GPU_CHECK=$(python -c "' >> /app/entrypoint.sh && \
+    echo 'import tensorflow as tf' >> /app/entrypoint.sh && \
+    echo 'try:' >> /app/entrypoint.sh && \
+    echo '    gpus = tf.config.experimental.list_physical_devices(\"GPU\")' >> /app/entrypoint.sh && \
+    echo '    print(f\"TF_GPUS:{len(gpus)}\")' >> /app/entrypoint.sh && \
+    echo '    if gpus:' >> /app/entrypoint.sh && \
+    echo '        print(\"TF_GPU_SUPPORT:True\")' >> /app/entrypoint.sh && \
+    echo '    else:' >> /app/entrypoint.sh && \
+    echo '        print(\"TF_GPU_SUPPORT:False\")' >> /app/entrypoint.sh && \
+    echo 'except Exception as e:' >> /app/entrypoint.sh && \
+    echo '    print(f\"TF_ERROR:{e}\")' >> /app/entrypoint.sh && \
+    echo '" 2>/dev/null || echo "TF_ERROR:Failed to import TensorFlow")' >> /app/entrypoint.sh && \
+    echo '' >> /app/entrypoint.sh && \
+    echo 'if echo "$TF_GPU_CHECK" | grep -q "TF_ERROR:"; then' >> /app/entrypoint.sh && \
+    echo '    echo -e "${RED}❌ TensorFlow GPU check failed${NC}"' >> /app/entrypoint.sh && \
+    echo 'else' >> /app/entrypoint.sh && \
+    echo '    TF_GPUS=$(echo "$TF_GPU_CHECK" | grep "TF_GPUS:" | cut -d: -f2)' >> /app/entrypoint.sh && \
+    echo '    if [[ "$TF_GPUS" -gt 0 ]]; then' >> /app/entrypoint.sh && \
+    echo '        echo -e "${GREEN}✅ TensorFlow GPU support verified${NC}"' >> /app/entrypoint.sh && \
+    echo '        echo -e "${BLUE}ℹ️  TensorFlow detected $TF_GPUS GPU(s)${NC}"' >> /app/entrypoint.sh && \
+    echo '    else' >> /app/entrypoint.sh && \
+    echo '        echo -e "${YELLOW}⚠️  TensorFlow running in CPU-only mode${NC}"' >> /app/entrypoint.sh && \
+    echo '    fi' >> /app/entrypoint.sh && \
+    echo 'fi' >> /app/entrypoint.sh && \
+    echo '' >> /app/entrypoint.sh && \
+    echo 'case "${1:-}" in' >> /app/entrypoint.sh && \
+    echo '    "--benchmark"|"benchmark")' >> /app/entrypoint.sh && \
+    echo '        echo -e "${BLUE}📊 Running benchmark...${NC}"' >> /app/entrypoint.sh && \
+    echo '        if [[ -f "/app/tf_benchmark.py" ]]; then' >> /app/entrypoint.sh && \
+    echo '            exec python /app/tf_benchmark.py --small' >> /app/entrypoint.sh && \
+    echo '        else' >> /app/entrypoint.sh && \
+    echo '            echo -e "${RED}❌ Benchmark script not found${NC}"' >> /app/entrypoint.sh && \
+    echo '            exit 1' >> /app/entrypoint.sh && \
+    echo '        fi' >> /app/entrypoint.sh && \
+    echo '        ;;' >> /app/entrypoint.sh && \
+    echo '    "--check-gpu"|"check-gpu")' >> /app/entrypoint.sh && \
+    echo '        echo -e "${BLUE}🔍 Running detailed GPU check...${NC}"' >> /app/entrypoint.sh && \
+    echo '        if [[ -f "/app/check_gpu.py" ]]; then' >> /app/entrypoint.sh && \
+    echo '            exec python /app/check_gpu.py' >> /app/entrypoint.sh && \
+    echo '        else' >> /app/entrypoint.sh && \
+    echo '            echo -e "${RED}❌ GPU check script not found${NC}"' >> /app/entrypoint.sh && \
+    echo '            exit 1' >> /app/entrypoint.sh && \
+    echo '        fi' >> /app/entrypoint.sh && \
+    echo '        ;;' >> /app/entrypoint.sh && \
+    echo '    "--jupyter"|"jupyter")' >> /app/entrypoint.sh && \
+    echo '        echo -e "${BLUE}📓 Starting Jupyter Lab...${NC}"' >> /app/entrypoint.sh && \
+    echo '        exec jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --LabApp.token=development' >> /app/entrypoint.sh && \
+    echo '        ;;' >> /app/entrypoint.sh && \
+    echo '    "--help"|"help")' >> /app/entrypoint.sh && \
+    echo '        echo "=================================================="' >> /app/entrypoint.sh && \
+    echo '        echo "Available commands:"' >> /app/entrypoint.sh && \
+    echo '        echo "  --benchmark       : Run GPU benchmark"' >> /app/entrypoint.sh && \
+    echo '        echo "  --check-gpu       : Detailed GPU diagnostics"' >> /app/entrypoint.sh && \
+    echo '        echo "  --jupyter         : Start Jupyter Lab"' >> /app/entrypoint.sh && \
+    echo '        echo "  --help            : Show this help"' >> /app/entrypoint.sh && \
+    echo '        echo "=================================================="' >> /app/entrypoint.sh && \
+    echo '        exit 0' >> /app/entrypoint.sh && \
+    echo '        ;;' >> /app/entrypoint.sh && \
+    echo '    "")' >> /app/entrypoint.sh && \
+    echo '        echo "=================================================="' >> /app/entrypoint.sh && \
+    echo '        echo -e "${GREEN}🎯 Container ready!${NC}"' >> /app/entrypoint.sh && \
+    echo '        echo "Available commands: --benchmark, --check-gpu, --jupyter, --help"' >> /app/entrypoint.sh && \
+    echo '        echo "=================================================="' >> /app/entrypoint.sh && \
+    echo '        exec bash' >> /app/entrypoint.sh && \
+    echo '        ;;' >> /app/entrypoint.sh && \
+    echo '    *)' >> /app/entrypoint.sh && \
+    echo '        exec "$@"' >> /app/entrypoint.sh && \
+    echo '        ;;' >> /app/entrypoint.sh && \
+    echo 'esac' >> /app/entrypoint.sh
+
+# Final cleanup and set permissions
+RUN chmod +x /app/entrypoint.sh && \
+    find /app -name "*.py" -exec chmod +x {} \; && \
+    find /app -name "*.pyc" -delete && \
+    find /app -name "*.pyo" -delete && \
+    find /app -name "__pycache__" -type d -exec rm -rf {} + && \
+    rm -rf /tmp/* /var/tmp/*
+
+# Set metadata
+LABEL org.opencontainers.image.title="TensorFlow GPU Custom (Fixed)" \
+      org.opencontainers.image.description="Fixed TensorFlow GPU container without circular dependencies" \
+      org.opencontainers.image.version="2.0" \
+      org.opencontainers.image.authors="mail@gkanev.com" \
+      org.opencontainers.image.source="https://github.com/mrgkanev/tensorflow-gpu-docker" \
+      org.opencontainers.image.licenses="MIT"
 
 # Switch to non-root user
 USER tensorflow
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import tensorflow as tf; tf.config.list_physical_devices('GPU')" || exit 1
+    CMD python -c "import tensorflow as tf; assert len(tf.config.list_physical_devices()) > 0" || exit 1
 
+# Use exec form for better signal handling
 ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["bash"]
