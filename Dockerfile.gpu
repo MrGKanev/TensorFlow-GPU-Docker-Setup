@@ -4,7 +4,7 @@ FROM tensorflow/tensorflow:2.11.0-gpu-jupyter
 # Set image metadata
 LABEL name="tensorflow-gpu-custom"
 LABEL maintainer="mail@gkanev.com"
-LABEL version="1.1"
+LABEL version="1.2"
 LABEL description="TensorFlow GPU image with additional tools for ML"
 
 # Additional NVIDIA environment variables for better performance
@@ -31,7 +31,7 @@ ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64:${LD_LIBRARY_PATH}"
 # Set a working directory
 WORKDIR /app
 
-# Install system dependencies for OpenCV and other packages with parallel downloads
+# Install system dependencies for OpenCV and other packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1-mesa-glx \
     libglib2.0-0 \
@@ -45,43 +45,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN pip install --no-cache-dir --upgrade pip && \
     pip uninstall -y opencv-python
 
-# Install Python packages using parallel background processes
-RUN pip install --no-cache-dir pandas & \
-    pip install --no-cache-dir scikit-learn & \
-    pip install --no-cache-dir matplotlib & \
-    pip install --no-cache-dir openpyxl & \
-    pip install --no-cache-dir pandas-stubs & \
-    wait
+# Copy requirements and install Python packages
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Install remaining packages in parallel
-RUN pip install --no-cache-dir pydot==2.0.0 & \
-    pip install --no-cache-dir opencv-python-headless & \
-    pip install --no-cache-dir graphviz & \
-    wait
+# Create scripts directory and copy all scripts
+RUN mkdir -p /app/scripts
+COPY scripts/ /app/scripts/
 
-# Clean up Python cache in parallel
-RUN find /usr/local/lib/python3.* -name __pycache__ -type d -print0 | xargs -0 -P 4 rm -rf
+# Set permissions for all scripts
+RUN chmod +x /app/scripts/*.py
 
-# Copy all test scripts at once and set permissions in parallel
-COPY test_gpu.py tensorflow_pycharm_fix.py tf_benchmark.py check_gpu.py /app/
-
-# Set permissions for all scripts in parallel
-RUN chmod +x /app/test_gpu.py /app/tensorflow_pycharm_fix.py /app/tf_benchmark.py /app/check_gpu.py
-
-# Create entrypoint script (optimized single operation)
-RUN { \
-    echo '#!/bin/bash'; \
-    echo 'echo "====================================================="'; \
-    echo 'echo "TensorFlow GPU Container"'; \
-    echo 'echo "====================================================="'; \
-    echo 'echo "To verify GPU access, run: python /app/check_gpu.py"'; \
-    echo 'echo "If no GPU is detected, ensure you:"'; \
-    echo 'echo "1. Have NVIDIA drivers installed on the host"'; \
-    echo 'echo "2. Installed nvidia-container-toolkit on the host"'; \
-    echo 'echo "3. Started the container with: --gpus all flag"'; \
-    echo 'echo "====================================================="'; \
-    echo 'exec "$@"'; \
-} > /entrypoint.sh && chmod +x /entrypoint.sh
+# Copy and setup entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["bash"]
