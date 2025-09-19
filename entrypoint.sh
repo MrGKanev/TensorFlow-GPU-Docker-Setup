@@ -23,18 +23,18 @@ echo -e "${YELLOW} Checking GPU availability...${NC}"
 
 if command -v nvidia-smi >/dev/null 2>&1; then
     if nvidia-smi >/dev/null 2>&1; then
-        echo -e "${GREEN}✅ NVIDIA SMI available${NC}"
+        echo -e "${GREEN} NVIDIA SMI available${NC}"
         GPU_COUNT=$(nvidia-smi -L 2>/dev/null | wc -l || echo 0)
-        echo -e "${BLUE}ℹ️  Hardware GPUs detected: $GPU_COUNT${NC}"
+        echo -e "${BLUE} Hardware GPUs detected: $GPU_COUNT${NC}"
     else
         echo -e "${YELLOW}⚠️  nvidia-smi failed to run${NC}"
     fi
 else
-    echo -e "${YELLOW}⚠️  nvidia-smi not available${NC}"
+    echo -e "${YELLOW} nvidia-smi not available${NC}"
 fi
 
 # TensorFlow GPU check
-echo -e "${YELLOW}🧠 Checking TensorFlow GPU support...${NC}"
+echo -e "${YELLOW} Checking TensorFlow GPU support...${NC}"
 
 TF_GPU_CHECK=$(python -c "
 import tensorflow as tf
@@ -50,25 +50,25 @@ except Exception as e:
 " 2>/dev/null || echo "TF_ERROR:Failed to import TensorFlow")
 
 if echo "$TF_GPU_CHECK" | grep -q "TF_ERROR:"; then
-    echo -e "${RED}❌ TensorFlow GPU check failed${NC}"
+    echo -e "${RED} TensorFlow GPU check failed${NC}"
 else
     TF_GPUS=$(echo "$TF_GPU_CHECK" | grep "TF_GPUS:" | cut -d: -f2)
     if [[ "$TF_GPUS" -gt 0 ]]; then
-        echo -e "${GREEN}✅ TensorFlow GPU support verified${NC}"
-        echo -e "${BLUE}ℹ️  TensorFlow detected $TF_GPUS GPU(s)${NC}"
+        echo -e "${GREEN} TensorFlow GPU support verified${NC}"
+        echo -e "${BLUE}ℹ  TensorFlow detected $TF_GPUS GPU(s)${NC}"
     else
-        echo -e "${YELLOW}⚠️  TensorFlow running in CPU-only mode${NC}"
+        echo -e "${YELLOW}  TensorFlow running in CPU-only mode${NC}"
     fi
 fi
 
 # Handle commands
 case "${1:-}" in
     "--benchmark"|"benchmark")
-        echo -e "${BLUE}📊 Running benchmark...${NC}"
+        echo -e "${BLUE} Running benchmark...${NC}"
         if [[ -f "/app/tf_benchmark.py" ]]; then
             exec python /app/tf_benchmark.py --small
         else
-            echo -e "${RED}❌ Benchmark script not found${NC}"
+            echo -e "${RED} Benchmark script not found${NC}"
             exit 1
         fi
         ;;
@@ -78,7 +78,7 @@ case "${1:-}" in
         if [[ -f "/app/check_gpu.py" ]]; then
             exec python /app/check_gpu.py
         else
-            echo -e "${RED}❌ GPU check script not found${NC}"
+            echo -e "${RED} GPU check script not found${NC}"
             exit 1
         fi
         ;;
