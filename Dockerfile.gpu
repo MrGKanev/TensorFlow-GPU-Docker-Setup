@@ -2,36 +2,28 @@
 FROM tensorflow/tensorflow:2.11.0-gpu-jupyter
 
 # Set image metadata
-LABEL name="tensorflow-gpu-custom"
-LABEL maintainer="mail@gkanev.com"
-LABEL version="1.1"
-LABEL description="TensorFlow GPU image with additional tools for ML"
+LABEL name="tensorflow-gpu-custom" \
+    maintainer="mail@gkanev.com" \
+    version="1.1" \
+    description="TensorFlow GPU image with additional tools for ML"
 
 # Additional NVIDIA environment variables for better performance
-ENV NVIDIA_VISIBLE_DEVICES=all
-ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
-ENV TF_FORCE_GPU_ALLOW_GROWTH=true
-ENV TF_XLA_FLAGS=--tf_xla_enable_xla_devices
+ENV NVIDIA_VISIBLE_DEVICES=all \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility \
+    TF_FORCE_GPU_ALLOW_GROWTH=true \
+    TF_XLA_FLAGS=--tf_xla_enable_xla_devices \
+    TF_GPU_THREAD_MODE=gpu_private \
+    TF_GPU_THREAD_COUNT=1 \
+    TF_CUDNN_RESET_RND_GEN_STATE=false \
+    TF_USE_CUDNN_AUTOTUNE=1 \
+    TF_FORCE_UNIFIED_MEMORY=1 \
+    PATH="/usr/local/cuda/bin:${PATH}" \
+    LD_LIBRARY_PATH="/usr/local/cuda/lib64:${LD_LIBRARY_PATH}"
 
-# Set better defaults for TensorFlow performance
-ENV TF_GPU_THREAD_MODE=gpu_private
-ENV TF_GPU_THREAD_COUNT=1
-
-# cuDNN configuration for better performance
-ENV TF_CUDNN_RESET_RND_GEN_STATE=false
-ENV TF_USE_CUDNN_AUTOTUNE=1
-
-# Set memory allocation to avoid OOM errors
-ENV TF_FORCE_UNIFIED_MEMORY=1
-
-# Add CUDA Path environment variables (early setup)
-ENV PATH="/usr/local/cuda/bin:${PATH}"
-ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64:${LD_LIBRARY_PATH}"
-
-# Set a working directory
+# Set working directory
 WORKDIR /app
 
-# Install system dependencies for OpenCV and other packages with parallel downloads
+# Install system dependencies in one layer with cleanup
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1-mesa-glx \
     libglib2.0-0 \
@@ -39,49 +31,30 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxext6 \
     libxrender-dev \
     libgomp1 \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# Upgrade pip and uninstall opencv-python in one layer
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip uninstall -y opencv-python
+# Upgrade pip and handle opencv conflicts in one layer
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip uninstall -y opencv-python
 
-# Install Python packages using parallel background processes
-RUN pip install --no-cache-dir pandas & \
-    pip install --no-cache-dir scikit-learn & \
-    pip install --no-cache-dir matplotlib & \
-    pip install --no-cache-dir openpyxl & \
-    pip install --no-cache-dir pandas-stubs & \
-    wait
+# Copy requirements and install packages in one optimized layer
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt \
+    && pip cache purge \
+    && find /usr/local/lib/python3.* -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null || true
 
-# Install remaining packages in parallel
-RUN pip install --no-cache-dir pydot==2.0.0 & \
-    pip install --no-cache-dir opencv-python-headless & \
-    pip install --no-cache-dir graphviz & \
-    wait
+# Create scripts directory and copy scripts in one layer
+COPY scripts/ ./scripts/
+RUN chmod +x scripts/*.py
 
-# Clean up Python cache in parallel
-RUN find /usr/local/lib/python3.* -name __pycache__ -type d -print0 | xargs -0 -P 4 rm -rf
+# Copy and setup entrypoint
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
-# Copy all test scripts at once and set permissions in parallel
-COPY test_gpu.py tensorflow_pycharm_fix.py tf_benchmark.py check_gpu.py /app/
-
-# Set permissions for all scripts in parallel
-RUN chmod +x /app/test_gpu.py /app/tensorflow_pycharm_fix.py /app/tf_benchmark.py /app/check_gpu.py
-
-# Create entrypoint script (optimized single operation)
-RUN { \
-    echo '#!/bin/bash'; \
-    echo 'echo "====================================================="'; \
-    echo 'echo "TensorFlow GPU Container"'; \
-    echo 'echo "====================================================="'; \
-    echo 'echo "To verify GPU access, run: python /app/check_gpu.py"'; \
-    echo 'echo "If no GPU is detected, ensure you:"'; \
-    echo 'echo "1. Have NVIDIA drivers installed on the host"'; \
-    echo 'echo "2. Installed nvidia-container-toolkit on the host"'; \
-    echo 'echo "3. Started the container with: --gpus all flag"'; \
-    echo 'echo "====================================================="'; \
-    echo 'exec "$@"'; \
-} > /entrypoint.sh && chmod +x /entrypoint.sh
+# Remove unnecessary files to reduce image size
+RUN apt-get autoremove -y \
+    && rm -rf requirements.txt
 
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["bash"]
