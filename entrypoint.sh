@@ -57,7 +57,7 @@ else
         echo -e "${GREEN} TensorFlow GPU support verified${NC}"
         echo -e "${BLUE}ℹ  TensorFlow detected $TF_GPUS GPU(s)${NC}"
     else
-        echo -e "${YELLOW}  TensorFlow running in CPU-only mode${NC}"
+        echo -e "${YELLOW} TensorFlow running in CPU-only mode${NC}"
     fi
 fi
 
