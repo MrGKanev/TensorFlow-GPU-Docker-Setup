@@ -4,6 +4,7 @@ scikit-learn
 matplotlib
 openpyxl
 pandas-stubs
+numpy
 
 # Computer vision
 opencv-python-headless
