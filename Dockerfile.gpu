@@ -1,13 +1,45 @@
-# Use the official TensorFlow GPU image with a specific version 
-FROM tensorflow/tensorflow:2.11.0-gpu-jupyter
+# Single-stage build for maximum compatibility
+# CUDA 12.5 with cuDNN 8.9 for TensorFlow 2.16.1
+FROM nvidia/cuda:12.5.1-cudnn-runtime-ubuntu22.04
 
 # Set image metadata
 LABEL name="tensorflow-gpu-custom" \
     maintainer="mail@gkanev.com" \
-    version="1.1" \
-    description="TensorFlow GPU image with additional tools for ML"
+    version="3.0" \
+    description="Lightweight TensorFlow 2.16.1 GPU image with Ubuntu 22.04, CUDA 12.5 and cuDNN 8.9" \
+    cuda.version="12.5.1" \
+    cudnn.version="8.9" \
+    tensorflow.version="2.16.1" \
+    ubuntu.version="22.04"
 
-# Additional NVIDIA environment variables for better performance
+# Prevent interactive prompts
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install Python and dependencies in one layer
+# TensorFlow 2.16.1 supports Python 3.9-3.12, using 3.11 for best performance
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.11 \
+    python3.11-dev \
+    python3-pip \
+    build-essential \
+    libgomp1 \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    ca-certificates \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Create symlinks for python/pip
+RUN ln -sf /usr/bin/python3.11 /usr/bin/python3 && \
+    ln -sf /usr/bin/python3.11 /usr/bin/python
+
+# Upgrade pip
+RUN python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# NVIDIA and TensorFlow environment variables for optimal performance
 ENV NVIDIA_VISIBLE_DEVICES=all \
     NVIDIA_DRIVER_CAPABILITIES=compute,utility \
     TF_FORCE_GPU_ALLOW_GROWTH=true \
@@ -17,34 +49,34 @@ ENV NVIDIA_VISIBLE_DEVICES=all \
     TF_CUDNN_RESET_RND_GEN_STATE=false \
     TF_USE_CUDNN_AUTOTUNE=1 \
     TF_FORCE_UNIFIED_MEMORY=1 \
+    TF_CPP_MIN_LOG_LEVEL=1 \
     PATH="/usr/local/cuda/bin:${PATH}" \
-    LD_LIBRARY_PATH="/usr/local/cuda/lib64:${LD_LIBRARY_PATH}"
+    LD_LIBRARY_PATH="/usr/local/cuda/lib64:${LD_LIBRARY_PATH}" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
 
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies in one layer with cleanup
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1-mesa-glx \
-    libglib2.0-0 \
-    libsm6 \
-    libxext6 \
-    libxrender-dev \
-    libgomp1 \
+# Copy and install requirements
+COPY requirements.txt /tmp/requirements.txt
+RUN python3 -m pip install --no-cache-dir -r /tmp/requirements.txt && \
+    rm /tmp/requirements.txt
+
+# Verify TensorFlow installation
+# RUN python3 -c "import tensorflow as tf; print('TensorFlow version:', tf.__version__); print('CUDA built:', tf.test.is_built_with_cuda())"
+
+# Now clean up build dependencies to reduce size
+RUN apt-get remove -y \
+    python3.11-dev \
+    build-essential \
+    && apt-get autoremove -y \
     && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+    && rm -rf /var/lib/apt/lists/* \
+    && find /usr/local/lib/python3.11 -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null || true \
+    && python3 -m pip cache purge
 
-# Upgrade pip and handle opencv conflicts in one layer
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip uninstall -y opencv-python
-
-# Copy requirements and install packages in one optimized layer
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt \
-    && pip cache purge \
-    && find /usr/local/lib/python3.* -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null || true
-
-# Create scripts directory and copy scripts in one layer
+# Copy scripts
 COPY scripts/ ./scripts/
 RUN chmod +x scripts/*.py
 
@@ -52,9 +84,12 @@ RUN chmod +x scripts/*.py
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# Remove unnecessary files to reduce image size
-RUN apt-get autoremove -y \
-    && rm -rf requirements.txt
+# Create non-root user for security
+RUN useradd -m -u 1000 -s /bin/bash tensorflow && \
+    chown -R tensorflow:tensorflow /app
 
-ENTRYPOINT ["/entrypoint.sh"]
+# Switch to non-root user
+USER tensorflow
+
+# ENTRYPOINT ["/entrypoint.sh"]
 CMD ["bash"]
