@@ -1,0 +1,21 @@
+# Core data science packages
+pandas
+scikit-learn
+matplotlib
+openpyxl
+pandas-stubs
+numpy
+
+# Computer vision
+opencv-python-headless
+
+# Visualization and graph tools
+pydot==2.0.0
+graphviz
+
+# Performance monitoring (for performance_monitor.py)
+psutil
+rich
+
+# Optional: NVIDIA ML Python bindings (may not be available in all environments)
+# nvidia-ml-py3

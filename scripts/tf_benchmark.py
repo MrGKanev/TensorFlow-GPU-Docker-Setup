@@ -44,12 +44,12 @@ class ModernBenchmark:
         if self.use_mixed_precision and gpus:
             policy = tf.keras.mixed_precision.Policy('mixed_float16')
             tf.keras.mixed_precision.set_global_policy(policy)
-            console.print("✅ Mixed precision enabled", style="green")
+            console.print("Mixed precision enabled", style="green")
         
         # XLA compilation
         if self.use_xla:
             tf.config.optimizer.set_jit(True)
-            console.print("✅ XLA compilation enabled", style="green")
+            console.print("XLA compilation enabled", style="green")
         
         # Thread optimization
         tf.config.threading.set_inter_op_parallelism_threads(0)
@@ -91,7 +91,7 @@ class ModernBenchmark:
     
     def benchmark_matrix_operations(self, size=5000, iterations=10):
         """Benchmark matrix operations with modern optimizations."""
-        console.print(f"\n🔄 Matrix Operations Benchmark ({size}x{size})", style="bold blue")
+        console.print(f"\n Matrix Operations Benchmark ({size}x{size})", style="bold blue")
         
         # Create test matrices
         with tf.device('/GPU:0' if tf.config.list_physical_devices('GPU') else '/CPU:0'):
@@ -135,14 +135,14 @@ class ModernBenchmark:
             'total_time_s': elapsed
         }
         
-        console.print(f"📊 Performance: {gflops:.2f} GFLOPS", style="green")
-        console.print(f"⏱️  Average time: {avg_time*1000:.2f} ms", style="yellow")
+        console.print(f"Performance: {gflops:.2f} GFLOPS", style="green")
+        console.print(f"Average time: {avg_time*1000:.2f} ms", style="yellow")
         
         return gflops
     
     def benchmark_cnn_training(self, batch_size=64, epochs=5):
         """Benchmark CNN training with modern optimizations."""
-        console.print(f"\n🧠 CNN Training Benchmark", style="bold blue")
+        console.print(f"\n CNN Training Benchmark", style="bold blue")
         
         # Create a modern CNN model
         model = tf.keras.Sequential([
@@ -199,14 +199,14 @@ class ModernBenchmark:
             'final_accuracy': history.history['accuracy'][-1]
         }
         
-        console.print(f"📊 Throughput: {samples_per_sec:.2f} samples/sec", style="green")
-        console.print(f"🎯 Final accuracy: {history.history['accuracy'][-1]:.4f}", style="yellow")
+        console.print(f"Throughput: {samples_per_sec:.2f} samples/sec", style="green")
+        console.print(f"Final accuracy: {history.history['accuracy'][-1]:.4f}", style="yellow")
         
         return samples_per_sec
     
     def benchmark_transformer_attention(self, seq_length=512, batch_size=32):
         """Benchmark transformer attention mechanism."""
-        console.print(f"\n🔮 Transformer Attention Benchmark", style="bold blue")
+        console.print(f"\n Transformer Attention Benchmark", style="bold blue")
         
         # Multi-head attention layer
         attention = tf.keras.layers.MultiHeadAttention(
@@ -235,13 +235,13 @@ class ModernBenchmark:
             'avg_time_ms': (elapsed / iterations) * 1000
         }
         
-        console.print(f"📊 Throughput: {tokens_per_sec:.2f} tokens/sec", style="green")
+        console.print(f"Throughput: {tokens_per_sec:.2f} tokens/sec", style="green")
         
         return tokens_per_sec
     
     def memory_profile(self):
         """Profile GPU memory usage."""
-        console.print(f"\n💾 Memory Profile", style="bold blue")
+        console.print(f"\n Memory Profile", style="bold blue")
         
         gpus = tf.config.list_physical_devices('GPU')
         if not gpus:
@@ -288,11 +288,11 @@ class ModernBenchmark:
         with open(filename, 'w') as f:
             json.dump(self.results, f, indent=2)
         
-        console.print(f"📄 Results saved to {filename}", style="green")
+        console.print(f" Results saved to {filename}", style="green")
     
     def run_all_benchmarks(self):
         """Run comprehensive benchmark suite."""
-        console.print("🚀 Starting Modern TensorFlow Benchmark", style="bold green")
+        console.print(" Starting Modern TensorFlow Benchmark", style="bold green")
         
         self.print_system_info()
         
@@ -305,7 +305,7 @@ class ModernBenchmark:
         # Save results
         self.save_results()
         
-        console.print("\n✅ Benchmark completed successfully!", style="bold green")
+        console.print("\n Benchmark completed successfully!", style="bold green")
 
 def main():
     parser = argparse.ArgumentParser(description="Modern TensorFlow GPU Benchmark")
