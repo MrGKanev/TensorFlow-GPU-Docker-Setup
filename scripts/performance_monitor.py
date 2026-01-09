@@ -9,7 +9,6 @@ metrics in real-time with web dashboard support.
 import time
 import psutil
 import threading
-import subprocess
 import json
 from datetime import datetime
 from typing import Dict, List, Optional
@@ -130,20 +129,20 @@ class PerformanceMonitor:
                 # Temperature
                 try:
                     temp = nvml.nvmlDeviceGetTemperature(handle, nvml.NVML_TEMPERATURE_GPU)
-                except:
+                except nvml.NVMLError:
                     temp = 0
-                
+
                 # Power
                 try:
                     power_draw = nvml.nvmlDeviceGetPowerUsage(handle) / 1000.0  # Convert to watts
                     power_limit = nvml.nvmlDeviceGetPowerManagementLimitConstraints(handle)[1] / 1000.0
-                except:
+                except nvml.NVMLError:
                     power_draw = power_limit = 0
-                
+
                 # Fan speed
                 try:
                     fan_speed = nvml.nvmlDeviceGetFanSpeed(handle)
-                except:
+                except nvml.NVMLError:
                     fan_speed = 0
                 
                 metrics.append(GPUMetrics(
@@ -385,7 +384,7 @@ def main():
                     try:
                         entry = json.loads(line.strip())
                         monitor.metrics_history.append(entry)
-                    except:
+                    except json.JSONDecodeError:
                         pass
         
         report = monitor.generate_report()

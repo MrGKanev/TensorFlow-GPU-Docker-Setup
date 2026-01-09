@@ -39,7 +39,7 @@ echo -e "${YELLOW} Checking TensorFlow GPU support...${NC}"
 TF_GPU_CHECK=$(python -c "
 import tensorflow as tf
 try:
-    gpus = tf.config.experimental.list_physical_devices('GPU')
+    gpus = tf.config.list_physical_devices('GPU')
     print(f'TF_GPUS:{len(gpus)}')
     if gpus:
         print('TF_GPU_SUPPORT:True')

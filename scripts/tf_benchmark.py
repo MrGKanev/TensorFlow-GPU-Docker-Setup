@@ -35,10 +35,10 @@ class ModernBenchmark:
     def setup_tf_optimizations(self):
         """Configure TensorFlow for optimal performance."""
         # GPU memory growth
-        gpus = tf.config.experimental.list_physical_devices('GPU')
+        gpus = tf.config.list_physical_devices('GPU')
         if gpus:
             for gpu in gpus:
-                tf.config.experimental.set_memory_growth(gpu, True)
+                tf.config.set_memory_growth(gpu, True)
         
         # Mixed precision
         if self.use_mixed_precision and gpus:
@@ -75,7 +75,7 @@ class ModernBenchmark:
                     details = tf.config.experimental.get_device_details(gpu)
                     compute_cap = details.get('compute_capability', 'Unknown')
                     table.add_row(f"GPU {i}", f"{gpu.name} (Compute: {compute_cap})")
-                except:
+                except RuntimeError:
                     table.add_row(f"GPU {i}", gpu.name)
         
         # System info

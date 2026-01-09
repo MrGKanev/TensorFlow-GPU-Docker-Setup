@@ -1,9 +1,6 @@
 {
   "name": "TensorFlow GPU Development Environment",
-  "dockerComposeFile": [
-    "../docker-compose.yml",
-    "docker-compose.devcontainer.yml"
-  ],
+  "dockerComposeFile": "../docker-compose.yml",
   "service": "tensorflow-gpu",
   "workspaceFolder": "/app",
   "shutdownAction": "stopCompose",
@@ -115,7 +112,7 @@
     }
   },
   // Use 'postCreateCommand' to run commands after the container is created.
-  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "postCreateCommand": "pip install --user -r /app/requirements.txt || true",
   // Configure tool-specific properties.
   "remoteUser": "vscode",
   // Set environment variables
@@ -138,5 +135,5 @@
   // Uncomment to connect as an existing user other than the container default. More info: https://aka.ms/dev-containers-non-root.
   "remoteUser": "vscode",
   // Use 'initializeCommand' to run commands on the host before the container starts
-  "initializeCommand": "bash .devcontainer/pre-build.sh"
+  "initializeCommand": "echo 'Initializing TensorFlow GPU container...'"
 }

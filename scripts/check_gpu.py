@@ -17,8 +17,8 @@ if len(gpus) > 0:
     try:
         gpu_details = tf.config.experimental.get_device_details(gpus[0])
         print("GPU Details:", gpu_details)
-    except:
-        print("Could not get detailed GPU information")
+    except RuntimeError as e:
+        print(f"Could not get detailed GPU information: {e}")
         
     # Try to allocate a small tensor on GPU to verify it's working
     try:

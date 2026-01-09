@@ -17,13 +17,10 @@ services:
       - ./:/app
       # Cache pip packages for faster rebuilds
       - pip-cache:/root/.cache/pip
-      # Persist Python packages installed via pip install
-      - python-packages:/usr/local/lib/python3.8/site-packages/user-packages
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - TF_FORCE_GPU_ALLOW_GROWTH=true
-      # Add Python path for user packages
-      - PYTHONPATH=/usr/local/lib/python3.8/site-packages/user-packages:/app
+      - PYTHONPATH=/app
     # Keep container running indefinitely
     tty: true
     stdin_open: true
@@ -38,4 +35,3 @@ services:
 
 volumes:
   pip-cache:
-  python-packages:
