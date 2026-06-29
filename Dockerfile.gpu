@@ -1,22 +1,20 @@
-# Use the official TensorFlow GPU image with a specific version 
-FROM tensorflow/tensorflow:2.11.0-gpu-jupyter
+# Use the official TensorFlow GPU image with a specific version
+FROM tensorflow/tensorflow:2.16.1-gpu-jupyter
 
 # Set image metadata
 LABEL name="tensorflow-gpu-custom" \
     maintainer="mail@gkanev.com" \
-    version="1.1" \
+    version="2.0" \
     description="TensorFlow GPU image with additional tools for ML"
 
 # Additional NVIDIA environment variables for better performance
 ENV NVIDIA_VISIBLE_DEVICES=all \
     NVIDIA_DRIVER_CAPABILITIES=compute,utility \
     TF_FORCE_GPU_ALLOW_GROWTH=true \
-    TF_XLA_FLAGS=--tf_xla_enable_xla_devices \
     TF_GPU_THREAD_MODE=gpu_private \
     TF_GPU_THREAD_COUNT=1 \
-    TF_CUDNN_RESET_RND_GEN_STATE=false \
     TF_USE_CUDNN_AUTOTUNE=1 \
-    TF_FORCE_UNIFIED_MEMORY=1 \
+    TF_USE_LEGACY_KERAS=1 \
     PATH="/usr/local/cuda/bin:${PATH}" \
     LD_LIBRARY_PATH="/usr/local/cuda/lib64:${LD_LIBRARY_PATH}"
 

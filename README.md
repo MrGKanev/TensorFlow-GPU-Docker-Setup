@@ -39,8 +39,8 @@ docker build -t tensorflow-gpu-custom -f Dockerfile.gpu .
 # Run with GPU support
 docker run --gpus all --name tensorflow-gpu-custom -it tensorflow-gpu-custom
 
-# Run the comprehensive GPU test
-docker run --gpus all -it tensorflow-gpu-custom python /app/test_gpu.py
+# Run the GPU check
+docker run --gpus all -it tensorflow-gpu-custom --check-gpu
 ```
 
 ## Using Pre-built Container from GitHub
@@ -54,8 +54,8 @@ docker pull ghcr.io/mrgkanev/tensorflow-gpu-custom:latest
 # Run with GPU support
 docker run --gpus all -it ghcr.io/mrgkanev/tensorflow-gpu-custom
 
-# Run the comprehensive GPU test
-docker run --gpus all -it ghcr.io/mrgkanev/tensorflow-gpu-custom python /app/test_gpu.py
+# Run the GPU check
+docker run --gpus all -it ghcr.io/mrgkanev/tensorflow-gpu-custom --check-gpu
 ```
 
 ## Included Packages
@@ -80,16 +80,17 @@ The Docker image includes several performance optimizations:
 ### Usage
 
 ```bash
-# Simple run (all benchmarks, standard sizes)
-python /app/tf_benchmark.py
-
-# Quick run with smaller sizes
-python /app/tf_benchmark.py --small
+# Run all benchmarks
+python /app/scripts/tf_benchmark.py
 
 # Run specific benchmarks
-python /app/tf_benchmark.py --matrix  # Matrix multiplication only
-python /app/tf_benchmark.py --dense   # Dense layer only
-python /app/tf_benchmark.py --conv    # Convolution only
+python /app/scripts/tf_benchmark.py --matrix-only     # Matrix multiplication only
+python /app/scripts/tf_benchmark.py --cnn-only        # CNN training only
+python /app/scripts/tf_benchmark.py --attention-only  # Transformer attention only
+
+# Disable optimizations
+python /app/scripts/tf_benchmark.py --no-mixed-precision
+python /app/scripts/tf_benchmark.py --no-xla
 ```
 
 ## Detailed Setup Instructions
@@ -135,38 +136,30 @@ import tensorflow as tf
 print(tf.config.list_physical_devices('GPU'))
 ```
 
-#### Option 2: Run the comprehensive test script
+#### Option 2: Run the GPU check script
 ```bash
-python /app/check_gpu.py
+python /app/scripts/check_gpu.py
 ```
 
-or
-
-```bash
-python /app/test_gpu.py
-```
-
-These scripts perform:
+The script performs:
 - GPU detection and environment checks
-- Matrix multiplication benchmarks comparing CPU vs GPU speed
-- Simple neural network training test
+- Test tensor computation on GPU
+- Detailed diagnostics if GPU is not detected
 
-## GPU Test Script
-
-The included `test_gpu.py` script provides comprehensive testing of your GPU setup:
+## GPU Check Script
 
 ```bash
 # Run directly from host
-docker run --gpus all -it tensorflow-gpu-custom python /app/test_gpu.py
+docker run --gpus all -it tensorflow-gpu-custom --check-gpu
 
 # Or run from inside the container
-python /app/test_gpu.py
+python /app/scripts/check_gpu.py
 ```
 
-The test script will:
+The script will:
 1. Check if TensorFlow can detect your GPU
-2. Run performance benchmarks using matrix multiplication
-3. Train a simple neural network to verify end-to-end functionality
+2. Print GPU details and compute capability
+3. Run a test computation to verify end-to-end GPU functionality
 4. Provide detailed diagnostics if GPU is not detected
 
 ## Using with PyCharm
@@ -197,7 +190,7 @@ To use this Docker container with PyCharm:
      for gpu in gpus:
          tf.config.experimental.set_memory_growth(gpu, True)
      ```
-   - See the included `tensorflow_pycharm_fix.py` script for a complete example
+   - Configure GPU memory growth at the start of your script to avoid OOM errors
 
 4. **Configure Run Configuration:**
    - Create a new Run Configuration
@@ -317,7 +310,7 @@ model.fit(X, y, epochs=5, batch_size=32)
 
 ## Notes
 
-- The Docker image is based on TensorFlow 2.11.0-gpu for optimal compatibility
+- The Docker image is based on TensorFlow 2.16.1-gpu with legacy Keras 2 support (`TF_USE_LEGACY_KERAS=1`)
 - The container includes proper environment setup for CUDA paths
 - If you encounter memory issues, adjust batch sizes or enable memory growth
 - Environment variables are set in the Dockerfile for optimal TensorFlow performance
@@ -331,7 +324,7 @@ If you see this error:
 KeyError: 'The optimizer cannot recognize variable lstm/lstm_cell/kernel:0'
 ```
 
-This happens because TensorFlow 2.11.0 has both experimental and legacy optimizers. The experimental optimizers have compatibility issues with certain layer types (especially LSTM).
+This can happen with certain layer types (especially LSTM). The image includes legacy Keras support via `TF_USE_LEGACY_KERAS=1`, but if you still encounter this:
 
 **Solution:**
 1. Use legacy optimizers:
@@ -360,4 +353,4 @@ Ensure your data matches the expected dimensions:
 X = X.reshape(batch_size, sequence_length, features)
 ```
 
-4. See the provided `tensorflow_pycharm_fix.py` script for complete examples
+4. Ensure your data matches the expected dimensions before passing to the model

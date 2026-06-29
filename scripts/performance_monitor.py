@@ -16,7 +16,7 @@ from dataclasses import dataclass, asdict
 from pathlib import Path
 
 try:
-    import nvidia_ml_py3 as nvml
+    import pynvml as nvml
     NVML_AVAILABLE = True
 except ImportError:
     NVML_AVAILABLE = False
@@ -118,7 +118,8 @@ class PerformanceMonitor:
                 handle = nvml.nvmlDeviceGetHandleByIndex(gpu_id)
                 
                 # Basic info
-                name = nvml.nvmlDeviceGetName(handle).decode('utf-8')
+                raw_name = nvml.nvmlDeviceGetName(handle)
+                name = raw_name.decode('utf-8') if isinstance(raw_name, bytes) else raw_name
                 
                 # Utilization
                 util = nvml.nvmlDeviceGetUtilizationRates(handle)

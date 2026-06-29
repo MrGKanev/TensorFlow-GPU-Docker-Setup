@@ -84,9 +84,8 @@ class ModernBenchmark:
         
         console.print(table)
     
-    @tf.function(experimental_relax_shapes=True)
+    @tf.function(reduce_retracing=True)
     def compiled_matmul(self, a, b):
-        """XLA-compiled matrix multiplication."""
         return tf.matmul(a, b)
     
     def benchmark_matrix_operations(self, size=5000, iterations=10):

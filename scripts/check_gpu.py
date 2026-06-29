@@ -1,9 +1,11 @@
-import tensorflow as tf
+#!/usr/bin/env python3
+import sys
 import os
+import tensorflow as tf
 
 # Display environment info
 print("TensorFlow version:", tf.__version__)
-print("Python version:", tf.python.platform.build_info.python_version)
+print("Python version:", sys.version)
 print("CUDA Availability:", tf.test.is_built_with_cuda())
 
 # Check GPU devices

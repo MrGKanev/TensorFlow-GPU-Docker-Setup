@@ -61,8 +61,7 @@
         "ms-vscode.vscode-github-issue-notebooks",
         "github.copilot",
         "github.copilot-chat",
-        "ms-vscode.hexdump",
-        "ms-vscode.vscode-github-issue-notebooks"
+        "ms-vscode.hexdump"
       ]
     }
   },
@@ -113,8 +112,6 @@
   },
   // Use 'postCreateCommand' to run commands after the container is created.
   "postCreateCommand": "pip install --user -r /app/requirements.txt || true",
-  // Configure tool-specific properties.
-  "remoteUser": "vscode",
   // Set environment variables
   "containerEnv": {
     "PYTHONPATH": "/app",

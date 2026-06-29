@@ -65,8 +65,8 @@ fi
 case "${1:-}" in
     "--benchmark"|"benchmark")
         echo -e "${BLUE} Running benchmark...${NC}"
-        if [[ -f "/app/tf_benchmark.py" ]]; then
-            exec python /app/tf_benchmark.py --small
+        if [[ -f "/app/scripts/tf_benchmark.py" ]]; then
+            exec python /app/scripts/tf_benchmark.py
         else
             echo -e "${RED} Benchmark script not found${NC}"
             exit 1
@@ -75,8 +75,8 @@ case "${1:-}" in
 
     "--check-gpu"|"check-gpu")
         echo -e "${BLUE}🔍 Running detailed GPU check...${NC}"
-        if [[ -f "/app/check_gpu.py" ]]; then
-            exec python /app/check_gpu.py
+        if [[ -f "/app/scripts/check_gpu.py" ]]; then
+            exec python /app/scripts/check_gpu.py
         else
             echo -e "${RED} GPU check script not found${NC}"
             exit 1
@@ -104,7 +104,7 @@ case "${1:-}" in
         echo -e "${GREEN}Container ready!${NC}"
         echo "Available commands: --benchmark, --check-gpu, --jupyter, --help"
         echo "=================================================="
-        exec bash
+        exec tail -f /dev/null
         ;;
 
     *)
