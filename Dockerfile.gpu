@@ -46,13 +46,13 @@ RUN pip install --no-cache-dir -r requirements.txt \
 COPY scripts/ ./scripts/
 RUN chmod +x scripts/*.py
 
-# Copy and setup entrypoint
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+# # Copy and setup entrypoint
+# COPY entrypoint.sh /entrypoint.sh
+# RUN chmod +x /entrypoint.sh
 
-# Remove unnecessary files to reduce image size
-RUN apt-get autoremove -y \
-    && rm -rf requirements.txt
+# # Remove unnecessary files to reduce image size
+# RUN apt-get autoremove -y \
+#     && rm -rf requirements.txt
 
-ENTRYPOINT ["/entrypoint.sh"]
+# ENTRYPOINT ["/entrypoint.sh"]
 CMD ["bash"]
