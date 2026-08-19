@@ -52,7 +52,8 @@ except Exception as e:
 if echo "$TF_GPU_CHECK" | grep -q "TF_ERROR:"; then
     echo -e "${RED} TensorFlow GPU check failed${NC}"
 else
-    TF_GPUS=$(echo "$TF_GPU_CHECK" | grep "TF_GPUS:" | cut -d: -f2)
+    TF_GPUS=$(echo "$TF_GPU_CHECK" | grep "TF_GPUS:" | cut -d: -f2 || true)
+    TF_GPUS=${TF_GPUS:-0}
     if [[ "$TF_GPUS" -gt 0 ]]; then
         echo -e "${GREEN} TensorFlow GPU support verified${NC}"
         echo -e "${BLUE}ℹ  TensorFlow detected $TF_GPUS GPU(s)${NC}"

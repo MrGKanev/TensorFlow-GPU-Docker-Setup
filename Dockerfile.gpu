@@ -36,6 +36,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN pip install --no-cache-dir --upgrade pip \
     && pip uninstall -y opencv-python
 
+# Install torch in its own layer so it stays cached independently of
+# requirements.txt - editing other deps below won't force a torch re-download.
+# Version is tracked in requirements-torch.txt (bump it there, not here)
+COPY requirements-torch.txt .
+RUN pip install --no-cache-dir -r requirements-torch.txt \
+    && pip cache purge
+
 # Copy requirements and install packages in one optimized layer
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt \
@@ -46,13 +53,15 @@ RUN pip install --no-cache-dir -r requirements.txt \
 COPY scripts/ ./scripts/
 RUN chmod +x scripts/*.py
 
-# # Copy and setup entrypoint
-# COPY entrypoint.sh /entrypoint.sh
-# RUN chmod +x /entrypoint.sh
+# Copy and setup entrypoint
+COPY --chmod=755 entrypoint.sh /entrypoint.sh
 
 # # Remove unnecessary files to reduce image size
 # RUN apt-get autoremove -y \
 #     && rm -rf requirements.txt
 
-# ENTRYPOINT ["/entrypoint.sh"]
+# Fall back to running the container command directly (with a one-time
+# warning) if /entrypoint.sh is ever missing or not executable, instead of
+# crashing the whole container
+ENTRYPOINT ["/bin/bash", "-c", "if [ -x /entrypoint.sh ]; then exec /entrypoint.sh \"$@\"; else echo 'WARNING: /entrypoint.sh not found or not executable - skipping startup checks' >&2; exec \"$@\"; fi", "--"]
 CMD ["bash"]

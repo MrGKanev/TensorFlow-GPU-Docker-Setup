@@ -4,8 +4,10 @@ scikit-learn>=1.3.0,<2.0.0
 matplotlib>=3.7.0,<4.0.0
 openpyxl>=3.1.0,<4.0.0
 numpy>=1.24.0,<2.0.0
-torch>=2.3
 
+# NOTE: torch version is tracked in requirements-torch.txt, not here - it's
+# installed in its own Dockerfile layer so its large download stays cached
+# when unrelated deps here change
 
 # Legacy Keras 2 compatibility layer for TF 2.16+
 tf-keras>=2.16.0

@@ -1,0 +1,3 @@
+# torch version lives here (not in requirements.txt) so it can be installed
+# in its own Dockerfile layer, cached independently of the rest of the deps
+torch>=2.3
