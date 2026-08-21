@@ -2,355 +2,167 @@
 
 ![TensorFlow Docker GPU Header](.github/img/docker-tensorflow-header.svg)
 
-This repository contains Docker configuration for running TensorFlow with GPU support. The setup includes optimizations for WSL2 environments and includes all necessary packages for data science and deep learning tasks.
+A ready-to-use Docker environment for TensorFlow GPU workloads. It is based on `tensorflow/tensorflow:2.16.1-gpu-jupyter` and adds common data-science, computer-vision, monitoring, and PyTorch packages.
+
+## What's included
+
+- TensorFlow 2.16.1 with GPU and Jupyter Lab support
+- CUDA libraries supplied by the upstream TensorFlow image
+- Legacy Keras 2 compatibility (`TF_USE_LEGACY_KERAS=1` and `tf-keras`)
+- PyTorch, NumPy, pandas, scikit-learn, Matplotlib, OpenCV, Graphviz, and OpenPyXL
+- GPU diagnostics, benchmarks, and a live performance monitor
+- Docker Compose configuration with NVIDIA GPU access, a pip cache, and ports for Jupyter Lab and TensorBoard
 
 ## Prerequisites
 
-- [Docker](https://docs.docker.com/get-docker/) installed
-- [Docker Compose](https://docs.docker.com/compose/install/) installed
-- [NVIDIA GPU](https://www.nvidia.com/en-us/geforce/) with [compatible drivers](https://www.nvidia.com/Download/index.aspx)
-- [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) installed
-- If using WSL2: [Properly configured GPU passthrough](https://docs.nvidia.com/cuda/wsl-user-guide/index.html)
+- Docker Engine and the Docker Compose plugin
+- An NVIDIA GPU with a compatible host driver
+- [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+- On Windows/WSL2, Docker Desktop with WSL integration and NVIDIA GPU support enabled
 
-## Quick Start
-
-### Using Docker Compose (Recommended)
+Confirm that Docker can see the GPU before building this image:
 
 ```bash
-# Build and run with Docker Compose
-docker-compose up --build
-
-# Run in detached mode
-docker-compose up --build -d
-
-# Access the running container
-docker exec -it tensorflow-gpu-custom bash
-
-# Stop the container
-docker-compose down
+nvidia-smi
+docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi
 ```
 
-### Using Docker Commands
+## Quick start
+
+Build and start the development container:
 
 ```bash
-# Build the image
+docker compose up --build -d
+```
+
+The Compose setup mounts the repository into `/app`, so changes to your project files are immediately visible in the container. Open a shell with:
+
+```bash
+docker compose exec tensorflow-gpu bash
+```
+
+Run GPU diagnostics:
+
+```bash
+docker compose exec tensorflow-gpu python /app/scripts/check_gpu.py
+```
+
+Stop the environment when finished:
+
+```bash
+docker compose down
+```
+
+`docker-compose` can be used in place of `docker compose` on older installations.
+
+## Run without Compose
+
+Build the image:
+
+```bash
 docker build -t tensorflow-gpu-custom -f Dockerfile.gpu .
-
-# Run with GPU support
-docker run --gpus all --name tensorflow-gpu-custom -it tensorflow-gpu-custom
-
-# Run the GPU check
-docker run --gpus all -it tensorflow-gpu-custom --check-gpu
 ```
 
-## Using Pre-built Container from GitHub
-
-This repository publishes a pre-built container to GitHub Container Registry, which you can use directly:
+Run an interactive shell with GPU access and the current directory mounted at `/app`:
 
 ```bash
-# Pull the pre-built image
+docker run --rm --gpus all -it -v "$PWD":/app tensorflow-gpu-custom bash
+```
+
+Or invoke an entrypoint command directly:
+
+```bash
+docker run --rm --gpus all tensorflow-gpu-custom --check-gpu
+docker run --rm --gpus all tensorflow-gpu-custom --benchmark
+docker run --rm --gpus all -p 8888:8888 tensorflow-gpu-custom --jupyter
+```
+
+## Use the published image
+
+The default-branch build is published to GitHub Container Registry:
+
+```bash
 docker pull ghcr.io/mrgkanev/tensorflow-gpu-custom:latest
-
-# Run with GPU support
-docker run --gpus all -it ghcr.io/mrgkanev/tensorflow-gpu-custom
-
-# Run the GPU check
-docker run --gpus all -it ghcr.io/mrgkanev/tensorflow-gpu-custom --check-gpu
+docker run --rm --gpus all -it ghcr.io/mrgkanev/tensorflow-gpu-custom:latest --check-gpu
 ```
 
-## Included Packages
+## Available container commands
 
-The Docker image includes the following packages:
-- TensorFlow 2.11.0 with GPU support
-- NumPy
-- Pandas
-- scikit-learn
-- CUDA and cuDNN libraries
+| Command | Purpose |
+| --- | --- |
+| `--check-gpu` | Prints TensorFlow, CUDA, and detected-GPU information, then runs a small GPU computation. |
+| `--benchmark` | Runs the complete TensorFlow benchmark suite. |
+| `--jupyter` | Starts Jupyter Lab at `http://localhost:8888` (token: `development`). |
+| `--help` | Shows the commands supported by the entrypoint. |
 
-## Performance Optimizations
+With Compose, Jupyter Lab and TensorBoard ports `8888` and `6006` are already published. The container prints a short GPU status check every time it starts.
 
-The Docker image includes several performance optimizations:
-- GPU memory growth configuration
-- Thread management for TensorFlow
-- cuDNN optimizations
-- Memory allocation to prevent OOM errors
+## Tools
 
-## Benchmarks
-
-### Usage
+### GPU diagnostics
 
 ```bash
-# Run all benchmarks
-python /app/scripts/tf_benchmark.py
-
-# Run specific benchmarks
-python /app/scripts/tf_benchmark.py --matrix-only     # Matrix multiplication only
-python /app/scripts/tf_benchmark.py --cnn-only        # CNN training only
-python /app/scripts/tf_benchmark.py --attention-only  # Transformer attention only
-
-# Disable optimizations
-python /app/scripts/tf_benchmark.py --no-mixed-precision
-python /app/scripts/tf_benchmark.py --no-xla
+docker compose exec tensorflow-gpu python /app/scripts/check_gpu.py
 ```
 
-## Detailed Setup Instructions
+This verifies that TensorFlow was built with CUDA support, lists available GPUs, and executes a tensor operation on the first GPU.
 
-### 1. Using Docker Compose
+### Benchmarks
 
-Save the `Dockerfile.gpu` and `docker-compose.yml` in your project directory:
+Run the full suite (matrix multiplication, CNN training, Transformer attention, and GPU-memory profiling):
 
 ```bash
-# Build and start the container with GPU support
-docker-compose up --build
+docker compose exec tensorflow-gpu python /app/scripts/tf_benchmark.py
 ```
 
-This will build the Docker image based on `Dockerfile.gpu` and start the container with proper GPU access.
-
-### 2. Building the Docker Image Manually
-
-Save the `Dockerfile.gpu` and `test_gpu.py` in your project directory, then build the image:
+Useful variants:
 
 ```bash
-docker build -t tensorflow-gpu-custom -f Dockerfile.gpu .
+python /app/scripts/tf_benchmark.py --matrix-only
+python /app/scripts/tf_benchmark.py --cnn-only
+python /app/scripts/tf_benchmark.py --attention-only
+python /app/scripts/tf_benchmark.py --no-mixed-precision --no-xla
 ```
 
-This command creates a Docker image named `tensorflow-gpu-custom` based on the content of `Dockerfile.gpu`.
+Full-suite results are written to `benchmark_results_<timestamp>.json` in `/app`.
 
-### 3. Run the Container with GPU Access
-
-To run the container with GPU support:
+### Performance monitor
 
 ```bash
-docker run --gpus all -it tensorflow-gpu-custom
+docker compose exec tensorflow-gpu python /app/scripts/performance_monitor.py
 ```
 
-The `--gpus all` flag is what enables GPU access from within the container.
+The monitor renders a live terminal dashboard and appends metrics to `performance_log.jsonl`. Change the interval or log location as needed:
 
-### 4. Verifying GPU Access
+```bash
+python /app/scripts/performance_monitor.py --interval 2 --log-file /app/metrics.jsonl
+python /app/scripts/performance_monitor.py --log-file /app/metrics.jsonl --report
+```
 
-Once inside the container, you can verify GPU access with these methods:
+## TensorFlow notes
 
-#### Option 1: Quick verification
+The image sets `TF_FORCE_GPU_ALLOW_GROWTH=true` to let TensorFlow allocate GPU memory on demand. You can also configure it in an application before creating tensors or models:
+
 ```python
 import tensorflow as tf
-print(tf.config.list_physical_devices('GPU'))
-```
 
-#### Option 2: Run the GPU check script
-```bash
-python /app/scripts/check_gpu.py
-```
-
-The script performs:
-- GPU detection and environment checks
-- Test tensor computation on GPU
-- Detailed diagnostics if GPU is not detected
-
-## GPU Check Script
-
-```bash
-# Run directly from host
-docker run --gpus all -it tensorflow-gpu-custom --check-gpu
-
-# Or run from inside the container
-python /app/scripts/check_gpu.py
-```
-
-The script will:
-1. Check if TensorFlow can detect your GPU
-2. Print GPU details and compute capability
-3. Run a test computation to verify end-to-end GPU functionality
-4. Provide detailed diagnostics if GPU is not detected
-
-## Using with PyCharm
-
-To use this Docker container with PyCharm:
-
-1. **Configure Docker integration in PyCharm:**
-   - Go to Settings/Preferences → Build, Execution, Deployment → Docker
-   - Add your Docker connection
-
-2. **Configure Python Interpreter:**
-   - Go to Settings/Preferences → Project → Python Interpreter
-   - Click the gear icon → Add → Docker
-   - Select your Docker server and the `tensorflow-gpu-custom` image
-
-3. **Fix common TensorFlow errors:**
-   - If you encounter optimizer errors with LSTM models (like `KeyError: 'The optimizer cannot recognize variable lstm/lstm_cell/kernel:0'`), use the legacy optimizers:
-     ```python
-     # Change this:
-     from tensorflow.keras.optimizers import Adam
-     
-     # To this:
-     from tensorflow.keras.optimizers.legacy import Adam
-     ```
-   - Configure GPU memory growth at the start of your script:
-     ```python
-     gpus = tf.config.list_physical_devices('GPU')
-     for gpu in gpus:
-         tf.config.experimental.set_memory_growth(gpu, True)
-     ```
-   - Configure GPU memory growth at the start of your script to avoid OOM errors
-
-4. **Configure Run Configuration:**
-   - Create a new Run Configuration
-   - Set the Docker container as the target environment
-   - Set the working directory to your project folder
-   - Map your local project directory to a directory in the container
-
-## Common Issues and Troubleshooting
-
-### GPU Not Detected
-
-If you see `GPUs available: []` or errors about CUDA, check:
-
-1. **NVIDIA Driver Installation**
-   ```bash
-   # On host machine
-   nvidia-smi
-   ```
-   
-2. **NVIDIA Container Toolkit Installation**
-   ```bash
-   # On Linux host
-   dpkg -l | grep nvidia-container-toolkit
-   
-   # Install if missing
-   sudo apt-get install -y nvidia-container-toolkit
-   sudo systemctl restart docker
-   ```
-
-3. **Test with NVIDIA's Base Container**
-   ```bash
-   docker run --gpus all --rm nvidia/cuda:11.6.2-base-ubuntu20.04 nvidia-smi
-   ```
-
-### WSL2-Specific Issues
-
-1. **Install NVIDIA Drivers for WSL**
-   - Download the [NVIDIA CUDA driver for WSL](https://developer.nvidia.com/cuda/wsl) 
-   - Install on your Windows host (not inside WSL)
-
-2. **Enable GPU in Docker Desktop**
-   - Open Docker Desktop Settings
-   - Go to Resources → WSL Integration
-   - Check "Enable NVIDIA GPU support in WSL 2"
-
-3. **Configure WSL**
-   - Create or edit `%USERPROFILE%\.wslconfig` file in Windows with:
-     ```
-     [wsl2]
-     kernelCommandLine = systemd.unified_cgroup_hierarchy=0
-     ```
-
-4. **Restart WSL**
-   ```
-   wsl --shutdown
-   ```
-
-### Performance Optimization
-
-1. **Configure Memory Growth**
-   ```python
-   gpus = tf.config.list_physical_devices('GPU')
-   for gpu in gpus:
-     tf.config.experimental.set_memory_growth(gpu, True)
-   ```
-
-2. **Monitor GPU Usage**
-   ```bash
-   # From host or another terminal
-   watch -n 0.5 nvidia-smi
-   ```
-
-## Docker Commands Quick Reference
-
-- Build with Docker Compose: `docker-compose up --build`
-- Stop Docker Compose container: `docker-compose down`
-- Build the image: `docker build -t tensorflow-gpu-custom -f Dockerfile.gpu .`
-- Run with GPU access: `docker run --gpus all -it tensorflow-gpu-custom`
-- Run with volume mount: `docker run --gpus all -v $(pwd):/app -it tensorflow-gpu-custom`
-- Check existing images: `docker images`
-- Check running containers: `docker ps`
-- Execute commands in running container: `docker exec -it tensorflow-gpu-custom bash`
-
-## Sample Training Code
-
-```python
-import numpy as np
-import tensorflow as tf
-from tensorflow.keras import layers
-from tensorflow.keras.optimizers.legacy import Adam
-
-# Check for GPU
-gpus = tf.config.list_physical_devices('GPU')
-print(f"GPUs available: {gpus}")
-
-# Optional: Enable memory growth
-for gpu in gpus:
+for gpu in tf.config.list_physical_devices("GPU"):
     tf.config.experimental.set_memory_growth(gpu, True)
-
-# Create a simple model
-model = tf.keras.Sequential([
-    layers.Dense(128, activation='relu', input_shape=(10,)),
-    layers.Dense(64, activation='relu'),
-    layers.Dense(1, activation='sigmoid')
-])
-
-# Compile the model
-model.compile(optimizer=Adam(), loss='binary_crossentropy', metrics=['accuracy'])
-
-# Generate some fake data
-X = np.random.random((1000, 10))
-y = np.random.randint(2, size=(1000, 1))
-
-# Train the model
-model.fit(X, y, epochs=5, batch_size=32)
 ```
 
-## Notes
+For existing projects that need Keras 2 behavior, the image enables legacy Keras by default. If an optimizer compatibility error still occurs, import the legacy optimizer explicitly:
 
-- The Docker image is based on TensorFlow 2.16.1-gpu with legacy Keras 2 support (`TF_USE_LEGACY_KERAS=1`)
-- The container includes proper environment setup for CUDA paths
-- If you encounter memory issues, adjust batch sizes or enable memory growth
-- Environment variables are set in the Dockerfile for optimal TensorFlow performance
-
-## Fixing Common TensorFlow Errors
-
-### KeyError with Optimizers
-
-If you see this error:
-```
-KeyError: 'The optimizer cannot recognize variable lstm/lstm_cell/kernel:0'
-```
-
-This can happen with certain layer types (especially LSTM). The image includes legacy Keras support via `TF_USE_LEGACY_KERAS=1`, but if you still encounter this:
-
-**Solution:**
-1. Use legacy optimizers:
 ```python
-# Change this
-from tensorflow.keras.optimizers import Adam
-
-# To this
 from tensorflow.keras.optimizers.legacy import Adam
 ```
 
-2. Make sure your input shapes are correct:
-```python
-# Check input shape expectations
-print(model.input_shape)
-```
+## Troubleshooting
 
-3. Fix shape mismatches in your data. If your error mentions:
-```
-Model was constructed with shape (None, 30, 1) but was called on input with incompatible shape (64, 1, 1)
-```
+1. Run `nvidia-smi` on the host. If it fails, install or update the NVIDIA driver.
+2. Run the NVIDIA CUDA test shown in [Prerequisites](#prerequisites). If it fails, install and configure NVIDIA Container Toolkit, then restart Docker.
+3. Run `docker compose logs tensorflow-gpu` and the included GPU diagnostic script.
+4. For WSL2-specific setup and additional failure modes, see [TROUBLESHOOTING.MD](TROUBLESHOOTING.MD).
 
-Ensure your data matches the expected dimensions:
-```python
-# Reshape your data to match expected input
-X = X.reshape(batch_size, sequence_length, features)
-```
+## License
 
-4. Ensure your data matches the expected dimensions before passing to the model
+This project is distributed under the [MIT License](LICENSE).
